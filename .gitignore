@@ -1,2 +1,4 @@
 .superpowers/
 .worktrees/
+windows-server/*.exe
+windows-server/*.log

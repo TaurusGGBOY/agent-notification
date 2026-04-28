@@ -21,13 +21,13 @@ The system has three parts:
 
 1. Windows server
    - Listens for HTTP notification requests.
-   - Responds to UDP discovery broadcasts.
+   - Advertises itself with mDNS/DNS-SD.
    - Shows Windows toast notifications.
    - Hosts a browser settings page.
 
 2. Discovery/configuration skill
    - Runs inside Claude Code and Codex-capable environments as a skill folder.
-   - Discovers the Windows server over UDP.
+   - Discovers Windows servers by browsing mDNS/DNS-SD service type `_agent-notify._tcp.local.`.
    - Lets the user choose a discovered URL and events.
    - Configures Claude Code hooks for `start` and `stop`.
    - Keeps sender scripts generic so future agents can reuse them.
@@ -79,6 +79,7 @@ Endpoints:
   "name": "Agent Notify Server",
   "version": "0.1.0",
   "url": "http://192.168.31.50:17891",
+  "serviceType": "_agent-notify._tcp.local.",
   "supportedEvents": ["start", "stop"],
   "supportedStyles": ["clean", "status-color", "agent-badge", "compact"]
 }
@@ -110,33 +111,29 @@ Validation:
 - Unknown fields are ignored.
 - `sourcePayload` is retained only for logging/debugging if logging is enabled.
 
-### UDP Discovery
+### mDNS/DNS-SD Discovery
 
-Default UDP port:
-
-```text
-17892
-```
-
-Discovery request:
+Automatic discovery uses one protocol only:
 
 ```text
-AGENT_NOTIFY_DISCOVER v1
+_agent-notify._tcp.local.
 ```
 
-Discovery response is JSON:
+The Windows server advertises an mDNS/DNS-SD service instance for its HTTP server on port `17891`.
+
+TXT records:
 
 ```json
 {
-  "name": "Agent Notify Server",
   "version": "0.1.0",
-  "url": "http://192.168.31.50:17891",
-  "hostname": "WIN-DESKTOP",
-  "supportedEvents": ["start", "stop"]
+  "events": "start,stop",
+  "styles": "clean,status-color,agent-badge,compact",
+  "path": "/notify",
+  "settings": "/settings"
 }
 ```
 
-The skill sends a UDP broadcast on the local subnet and collects responses for a short timeout. If discovery fails, the user can manually provide a URL.
+The skill browses `_agent-notify._tcp.local.` and lists every discovered server. If mDNS discovery fails, the only fallback is manual URL entry. There is no UDP broadcast fallback and no subnet scanning fallback.
 
 ## Notification Styles
 
@@ -172,7 +169,7 @@ http://<windows-ip>:17891/settings
 MVP settings page:
 
 - Shows server status.
-- Shows HTTP URL and UDP discovery port.
+- Shows HTTP URL and mDNS service type.
 - Shows four notification style preset cards.
 - Shows browser preview for each style.
 - Saves the selected style.
@@ -276,8 +273,11 @@ Sender script:
 
 Discovery:
 
-- If UDP broadcast fails, fall back to manual URL.
-- If `/manifest` fails, allow manual confirmation of URL before configuring hooks.
+- Browse `_agent-notify._tcp.local.` with mDNS/DNS-SD.
+- Present every discovered server.
+- `--manual <URL>` validates a provided URL with `/manifest`.
+- No UDP broadcast.
+- No subnet scanning.
 
 ## Security Notes
 
@@ -300,7 +300,7 @@ Unit tests:
 - Payload validation.
 - Config read/write.
 - Style selection logic.
-- Discovery response formatting.
+- mDNS TXT record formatting.
 - Sender payload normalization.
 
 Integration tests:
@@ -308,7 +308,7 @@ Integration tests:
 - `GET /health`.
 - `GET /manifest`.
 - `POST /notify` with valid and invalid events.
-- UDP discovery request/response.
+- mDNS service advertisement metadata.
 - Settings page loads and saves style.
 
 Manual Windows tests:
@@ -319,11 +319,68 @@ Manual Windows tests:
 - `Send Test Toast` displays a toast for each preset.
 - Claude Code `SessionStart` and `Stop` hooks send notifications.
 
-## Open Decisions
+## Open Decisions → RESOLVED
 
-- Exact implementation language for the Windows server.
-  - Recommended: Go, because it produces a simple Windows exe and can also build helper CLIs later.
-- Toast implementation mechanism.
-  - Recommended MVP: use a proven Windows toast library or a minimal PowerShell bridge if reliable.
-- Exact persistence path.
-  - Recommended: `%APPDATA%\AgentNotify\config.json`.
+| Decision | Resolution | Rationale |
+|----------|------------|-----------|
+| Windows server location | Same repo `windows-server/` | Monorepo reduces drift, simpler CI |
+| Skill install path | Repo canonical + install script | Source in repo, deployed to `~/.claude/skills/` |
+| Build strategy | Cross-compile from macOS | Pure Go HTTP, no native deps in MVP |
+| Toast implementation | Mature Windows toast library | PowerShell bridge ok only for prototype |
+
+**To build on Windows before release**: use Windows CI runner or manual build.
+
+## Appendix: Codex Discussion Notes
+
+- Cross-compile works if server is pure Go (no COM/Windows API deps in exe)
+- If toast library requires app identity/shortcut handling → build on Windows
+- Skill: keep canonical in repo, symlink/copy to `~/.claude/skills/` for runtime
+
+## Codex Review Findings (Implementation Phase)
+
+### Bugs to Fix
+
+1. **Discovery protocol mismatch** - Existing UDP broadcast approach failed in Claude Code/macOS and should be replaced with mDNS/DNS-SD advertisement plus mDNS browsing. Manual URL is the only fallback.
+
+2. **Manifest incomplete** - `handlers.go:18` `ManifestResponse` missing `url`, `supportedEvents`, `supportedStyles`. `configure_claude.py` needs these fields.
+
+3. **Settings save bug** - Allowlist logic inverted in `settings.go:183`. UI builds empty `saveData`, style/events likely never persist.
+
+### Install Script (Missing)
+
+Add `scripts/install-skill.sh`:
+- Detects repo root, validates skill files
+- Creates `~/.claude/skills/`, copies or symlinks `skills/agent-notify-discovery`
+- Idempotent, prints installed path
+- Optionally runs discovery test
+
+### Unit Tests (Expanded)
+
+**Go server:**
+- `GET /manifest` exact fields (`url`, `supportedEvents`, `supportedStyles`)
+- mDNS/DNS-SD service type and TXT record formatting
+- `POST /notify` invalid event returns `400`
+- Toast failure returns `500`
+
+**Go config/settings:**
+- Valid style whitelist validation
+- Enabled event whitelist validation
+- Save/load round trip
+- UI POST persists style/events
+
+**Python skill:**
+- `send.py` stdin JSON normalization
+- Unreachable URL exits `0`
+- `--strict` exits nonzero
+- Timeout behavior
+
+**Python discovery:**
+- Browse `_agent-notify._tcp.local.`
+- Return multiple discovered servers
+- Manual URL fallback only
+
+**Claude config:**
+- Preserves existing hooks
+- Idempotent rerun
+- Global vs project path
+- Command quoting with spaces

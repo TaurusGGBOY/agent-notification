@@ -358,11 +358,11 @@ func TestManifestHandler(t *testing.T) {
 	var resp ManifestResponse
 	json.NewDecoder(w.Body).Decode(&resp)
 
-	if resp.Name != "agent-notify-server" {
-		t.Errorf("expected name 'agent-notify-server', got %q", resp.Name)
+	if resp.Name != "Agent Notify Server" {
+		t.Errorf("expected name 'Agent Notify Server', got %q", resp.Name)
 	}
-	if resp.Protocol != "AGENT_NOTIFY_DISCOVER v1" {
-		t.Errorf("expected protocol 'AGENT_NOTIFY_DISCOVER v1', got %q", resp.Protocol)
+	if resp.Protocol != "mdns-dns-sd" {
+		t.Errorf("expected protocol 'mdns-dns-sd', got %q", resp.Protocol)
 	}
 	if resp.Version != "1.0.0" {
 		t.Errorf("expected version '1.0.0', got %q", resp.Version)
@@ -383,13 +383,18 @@ func TestHealthHandler_WrongMethod(t *testing.T) {
 	}
 }
 
-// === UDP Discovery Response Tests ===
+// === mDNS Discovery TXT Tests ===
 
-func TestDiscoveryResponse_JSONFormat(t *testing.T) {
-	resp := DiscoveryResponse{
+func TestManifestResponse_Fields(t *testing.T) {
+	resp := ManifestResponse{
+		Name:            "Agent Notify Server",
+		Version:         "1.0.0",
 		URL:             "http://localhost:17891",
 		Hostname:        "test-host",
-		SupportedEvents:  []string{"start", "stop"},
+		Protocol:        "mdns-dns-sd",
+		ServiceType:     "_agent-notify._tcp.local.",
+		Description:     "Windows notification server",
+		SupportedEvents: []string{"start", "stop"},
 		SupportedStyles: []string{"clean", "status-color", "agent-badge", "compact"},
 	}
 
@@ -407,11 +412,8 @@ func TestDiscoveryResponse_JSONFormat(t *testing.T) {
 	if hostname, ok := restored["hostname"].(string); !ok || hostname == "" {
 		t.Error("hostname field missing or empty")
 	}
-	if events, ok := restored["supportedEvents"].([]interface{}); !ok || len(events) == 0 {
-		t.Error("supportedEvents field missing or empty")
-	}
-	if styles, ok := restored["supportedStyles"].([]interface{}); !ok || len(styles) == 0 {
-		t.Error("supportedStyles field missing or empty")
+	if serviceType, ok := restored["serviceType"].(string); !ok || serviceType == "" {
+		t.Error("serviceType field missing or empty")
 	}
 }
 
@@ -597,6 +599,7 @@ func TestManifestHandler_ExtendedFields(t *testing.T) {
 	server := NewServer(cfg)
 
 	req := httptest.NewRequest(http.MethodGet, "/manifest", nil)
+	req.Host = "localhost:17891"
 	w := httptest.NewRecorder()
 
 	server.ManifestHandler(w, req)
@@ -606,6 +609,14 @@ func TestManifestHandler_ExtendedFields(t *testing.T) {
 
 	if resp.URL != "http://localhost:17891" {
 		t.Errorf("expected url 'http://localhost:17891', got %q", resp.URL)
+	}
+
+	if resp.Hostname == "" {
+		t.Error("hostname should not be empty")
+	}
+
+	if resp.ServiceType == "" {
+		t.Error("serviceType should not be empty")
 	}
 
 	if len(resp.SupportedEvents) == 0 {

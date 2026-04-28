@@ -4,15 +4,31 @@ import (
 	"encoding/json"
 	"log"
 	"net/http"
+	"os"
 	"strings"
 	"time"
 )
 
 const (
 	version         = "1.0.0"
-	supportedStyles = "clean,status-color,agent-badge,compact"
-	supportedEvents = "start,stop"
+	mdnsServiceType = "_agent-notify._tcp"
 )
+
+func supportedEvents() []string {
+	return []string{"start", "stop"}
+}
+
+func supportedStyles() []string {
+	return []string{"clean", "status-color", "agent-badge", "compact"}
+}
+
+func localHostname() string {
+	host, err := os.Hostname()
+	if err != nil || host == "" {
+		return "unknown"
+	}
+	return host
+}
 
 type HealthResponse struct {
 	Status  string `json:"status"`
@@ -20,13 +36,15 @@ type HealthResponse struct {
 }
 
 type ManifestResponse struct {
-	Name             string   `json:"name"`
-	Version          string   `json:"version"`
-	Protocol         string   `json:"protocol"`
-	Description      string   `json:"description"`
-	URL              string   `json:"url"`
-	SupportedEvents  []string `json:"supportedEvents"`
-	SupportedStyles  []string `json:"supportedStyles"`
+	Name            string   `json:"name"`
+	Version         string   `json:"version"`
+	URL             string   `json:"url"`
+	Hostname        string   `json:"hostname"`
+	Protocol        string   `json:"protocol"`
+	ServiceType     string   `json:"serviceType"`
+	Description     string   `json:"description"`
+	SupportedEvents []string `json:"supportedEvents"`
+	SupportedStyles []string `json:"supportedStyles"`
 }
 
 type NotifyPayload struct {
@@ -45,7 +63,7 @@ type ErrorResponse struct {
 
 type Server struct {
 	config   *Config
-	notifier *ToastNotifier
+	notifier Notifier
 }
 
 func NewServer(cfg *Config) *Server {
@@ -77,13 +95,15 @@ func (s *Server) ManifestHandler(w http.ResponseWriter, r *http.Request) {
 	}
 
 	resp := ManifestResponse{
-		Name:             "agent-notify-server",
-		Version:          version,
-		Protocol:         "AGENT_NOTIFY_DISCOVER v1",
-		Description:      "Windows notification server for Claude Code agent events",
-		URL:              "http://localhost:17891",
-		SupportedEvents:  strings.Split(supportedEvents, ","),
-		SupportedStyles:  strings.Split(supportedStyles, ","),
+		Name:            "Agent Notify Server",
+		Version:         version,
+		URL:             "http://" + r.Host,
+		Hostname:        localHostname(),
+		Protocol:        "mdns-dns-sd",
+		ServiceType:     mdnsServiceType + ".local.",
+		Description:     "Windows notification server for agent start/stop events",
+		SupportedEvents: supportedEvents(),
+		SupportedStyles: supportedStyles(),
 	}
 
 	w.Header().Set("Content-Type", "application/json")

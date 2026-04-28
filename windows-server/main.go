@@ -1,15 +1,24 @@
 package main
 
 import (
+	"context"
 	"log"
 	"net/http"
+	"os"
+	"strings"
 )
 
-const (
-	httpAddr = "0.0.0.0:17891"
-)
+func envOrDefault(name, fallback string) string {
+	value := strings.TrimSpace(os.Getenv(name))
+	if value == "" {
+		return fallback
+	}
+	return value
+}
 
 func main() {
+	httpAddr := envOrDefault("AGENT_NOTIFY_HTTP_ADDR", "0.0.0.0:17891")
+
 	log.Println("Starting Agent Notify Server...")
 
 	cfg, err := LoadConfig()
@@ -36,7 +45,12 @@ func main() {
 		}
 	}()
 
-	go StartUDPDiscovery()
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+
+	if err := StartMDNSAdvertisement(ctx, 17891); err != nil {
+		log.Printf("Warning: mDNS advertisement failed: %v", err)
+	}
 
 	log.Println("Server started successfully")
 	select {}

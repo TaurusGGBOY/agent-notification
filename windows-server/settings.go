@@ -181,9 +181,11 @@ function updatePreview() {
 }
 
 async function saveSettings() {
-  const saveKeys = {notificationStyle:true, enabledEvents:true};
-  const saveData = {};
-  for (const [k,v] of Object.entries(config)) if (saveKeys[k]) saveData[k] = v;
+  const saveData = {
+    notificationStyle: config.notificationStyle,
+    enabledEvents: config.enabledEvents,
+    futureOverrides: config.futureOverrides || {}
+  };
 
   try {
     const res = await fetch('/settings', {
@@ -276,18 +278,21 @@ func (h *SettingsHandler) handlePost(w http.ResponseWriter, r *http.Request) {
 
 	// Apply updates
 	if style, ok := updates["notificationStyle"].(string); ok {
-		if isValidStyle(style) {
+		if IsSupportedStyle(style) {
 			cfg.NotificationStyle = style
 		}
 	}
 	if events, ok := updates["enabledEvents"].([]interface{}); ok {
 		cfg.EnabledEvents = make([]string, 0, len(events))
 		for _, e := range events {
-			if s, ok := e.(string); ok && isValidEvent(s) {
+			if s, ok := e.(string); ok && IsSupportedEvent(s) {
 				cfg.EnabledEvents = append(cfg.EnabledEvents, s)
 			}
 		}
 	}
+
+	// Normalize and ensure valid state
+	cfg.Normalize()
 
 	// Ensure directory exists
 	dir := filepath.Dir(h.configPath)

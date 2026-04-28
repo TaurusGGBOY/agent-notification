@@ -39,6 +39,7 @@ func LoadConfig() (*Config, error) {
 		return nil, err
 	}
 
+	cfg.Normalize()
 	return &cfg, nil
 }
 
@@ -57,4 +58,39 @@ func (c *Config) IsEventEnabled(event string) bool {
 		}
 	}
 	return false
+}
+
+func IsSupportedStyle(style string) bool {
+	for _, supported := range []string{"clean", "status-color", "agent-badge", "compact"} {
+		if style == supported {
+			return true
+		}
+	}
+	return false
+}
+
+func IsSupportedEvent(event string) bool {
+	return event == "start" || event == "stop"
+}
+
+func (c *Config) Normalize() {
+	if !IsSupportedStyle(c.NotificationStyle) {
+		c.NotificationStyle = "clean"
+	}
+	if len(c.EnabledEvents) == 0 {
+		c.EnabledEvents = []string{"start", "stop"}
+		return
+	}
+	filtered := make([]string, 0, len(c.EnabledEvents))
+	seen := map[string]bool{}
+	for _, event := range c.EnabledEvents {
+		if IsSupportedEvent(event) && !seen[event] {
+			filtered = append(filtered, event)
+			seen[event] = true
+		}
+	}
+	c.EnabledEvents = filtered
+	if c.FutureOverrides == nil {
+		c.FutureOverrides = map[string]string{}
+	}
 }
