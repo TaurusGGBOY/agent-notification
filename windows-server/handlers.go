@@ -140,7 +140,13 @@ func (s *Server) NotifyHandler(w http.ResponseWriter, r *http.Request) {
 	title := formatTitle(payload.Agent, event)
 	message := formatMessage(payload)
 
-	if err := s.notifier.Notify(title, message); err != nil {
+	if err := s.notifier.NotifyWithStyle(
+		s.config.NotificationStyle,
+		event,
+		title,
+		message,
+		payload.Agent,
+	); err != nil {
 		log.Printf("Toast notification failed: %v", err)
 	}
 
