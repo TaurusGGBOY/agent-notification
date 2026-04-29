@@ -5,6 +5,7 @@ package main
 
 import (
 	"bytes"
+	"fmt"
 	"os/exec"
 	"strings"
 )
@@ -47,7 +48,6 @@ func formatToastXML(style, event, title, agent, extra string) string {
 	case StyleCompact:
 		return buildCompactXML(event, title, agent)
 	case StyleClean:
-	default:
 		return buildCleanXML(title, agent, extra)
 	}
 	return buildCleanXML(title, agent, extra)
@@ -132,9 +132,9 @@ func runPowerShell(script string) error {
 	err := cmd.Run()
 	if err != nil {
 		if stderr.Len() > 0 {
-			return err
+			return fmt.Errorf("powershell error: %v - %s", err, stderr.String())
 		}
-		return err
+		return fmt.Errorf("powershell error: %v", err)
 	}
 	return nil
 }
