@@ -310,6 +310,7 @@ Integration tests:
 - `POST /notify` with valid and invalid events.
 - mDNS service advertisement metadata.
 - Settings page loads and saves style.
+- Local discovery smoke test: start the server locally with `go run .`, then run the installed skill's `discover.py` and require it to find that local mDNS service.
 
 Manual Windows tests:
 
@@ -378,6 +379,7 @@ Add `scripts/install-skill.sh`:
 - Browse `_agent-notify._tcp.local.`
 - Return multiple discovered servers
 - Manual URL fallback only
+- Local smoke test starts the server on the same machine and must discover it before remote LAN discovery is considered.
 
 **Claude config:**
 - Preserves existing hooks

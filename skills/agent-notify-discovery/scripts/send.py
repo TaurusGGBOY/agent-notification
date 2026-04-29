@@ -1,16 +1,14 @@
 #!/usr/bin/env python3
-"""Send notification to Agent Notify Server."""
+"""Send a normalized notification to Agent Notify Server."""
 
-import sys
-import json
 import argparse
-import requests
-
-DEFAULT_TIMEOUT = 3
+import json
+import sys
+import urllib.error
+import urllib.request
 
 
 def normalize_payload(source_json):
-    """Extract fields for normalized payload."""
     try:
         data = json.loads(source_json)
     except json.JSONDecodeError:
@@ -23,7 +21,7 @@ def normalize_payload(source_json):
         "cwd": data.get("cwd", ""),
         "message": data.get("message", ""),
         "timestamp": data.get("timestamp", ""),
-        "sourcePayload": data.get("sourcePayload", {}),
+        "sourcePayload": data,
     }
 
 
@@ -38,23 +36,29 @@ def send_notification(url, agent, event, project="", cwd="", message="", timesta
         "sourcePayload": {},
     }
 
+    notify_url = url.rstrip("/") + "/notify"
+    data = json.dumps(payload).encode("utf-8")
+    req = urllib.request.Request(
+        notify_url,
+        data=data,
+        headers={"Content-Type": "application/json"},
+        method="POST",
+    )
+
     try:
-        resp = requests.post(f"{url}/notify", json=payload, timeout=DEFAULT_TIMEOUT)
-        if resp.status_code == 204:
-            print("Notification sent.", file=sys.stderr)
-            return 0
-        else:
-            print(f"Server returned {resp.status_code}", file=sys.stderr)
+        with urllib.request.urlopen(req, timeout=5) as resp:
+            if 200 <= resp.status < 300:
+                print("Notification sent successfully")
+                return 0
+            print(f"Notification failed: HTTP {resp.status}", file=sys.stderr)
             return 1 if strict else 0
-    except requests.exceptions.Timeout:
-        print("Timeout reaching server", file=sys.stderr)
-        return 0 if not strict else 2
-    except requests.exceptions.ConnectionError:
-        print("Cannot connect to server", file=sys.stderr)
-        return 0 if not strict else 1
-    except Exception as e:
-        print(f"Error: {e}", file=sys.stderr)
-        return 0 if not strict else 1
+    except urllib.error.URLError as err:
+        reason = getattr(err, "reason", err)
+        print(f"Notification failed: {reason}", file=sys.stderr)
+        return 1 if strict else 0
+    except Exception as err:
+        print(f"Notification failed: {err}", file=sys.stderr)
+        return 1 if strict else 0
 
 
 def main():
@@ -67,29 +71,32 @@ def main():
     parser.add_argument("--message", default="", help="Notification message")
     parser.add_argument("--timestamp", default="", help="ISO timestamp")
     parser.add_argument("--strict", action="store_true", help="Exit non-zero on failure")
-
     args = parser.parse_args()
 
-    # Try read stdin for hook JSON
     stdin_data = ""
     if not sys.stdin.isatty():
         stdin_data = sys.stdin.read().strip()
 
     if stdin_data:
         payload = normalize_payload(stdin_data)
-        args.agent = payload.get("agent", args.agent)
-        args.event = payload.get("event", args.event)
-        args.project = payload.get("project", args.project)
-        args.cwd = payload.get("cwd", args.cwd)
-        args.message = payload.get("message", args.message)
-        args.timestamp = payload.get("timestamp", args.timestamp)
+        args.agent = payload.get("agent") or args.agent
+        args.event = payload.get("event") or args.event
+        args.project = payload.get("project") or args.project
+        args.cwd = payload.get("cwd") or args.cwd
+        args.message = payload.get("message") or args.message
+        args.timestamp = payload.get("timestamp") or args.timestamp
 
     return send_notification(
-        args.url, args.agent, args.event,
-        args.project, args.cwd, args.message, args.timestamp,
-        args.strict
+        args.url,
+        args.agent,
+        args.event,
+        args.project,
+        args.cwd,
+        args.message,
+        args.timestamp,
+        args.strict,
     )
 
 
 if __name__ == "__main__":
-    sys.exit(main())
+    raise SystemExit(main())
