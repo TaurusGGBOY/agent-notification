@@ -7,6 +7,7 @@ import (
 	"net/http/httptest"
 	"os"
 	"path/filepath"
+	"strings"
 	"testing"
 )
 
@@ -712,6 +713,67 @@ func TestSettingsHandler_InvalidEventNotSaved(t *testing.T) {
 	for _, e := range cfg.EnabledEvents {
 		if e == "invalid-event" {
 			t.Error("invalid event should not have been saved")
+		}
+	}
+}
+
+// === XML Generation Tests ===
+
+func TestFormatToastXML_Clean(t *testing.T) {
+	xml := formatToastXML("clean", "start", "Agent Started", "claude", "agent-notification")
+	if !strings.Contains(xml, "ToastGeneric") {
+		t.Error("clean style should use ToastGeneric template")
+	}
+	if strings.Contains(xml, "appLogoOverride") {
+		t.Error("clean style should not have appLogoOverride")
+	}
+}
+
+func TestFormatToastXML_StatusColor(t *testing.T) {
+	xml := formatToastXML("status-color", "stop", "Agent Stopped", "claude", "agent-notification")
+	if !strings.Contains(xml, "appLogoOverride") {
+		t.Error("status-color should have appLogoOverride")
+	}
+	if !strings.Contains(xml, "Stopped") {
+		t.Error("status-color should have attribution text")
+	}
+}
+
+func TestFormatToastXML_AgentBadge(t *testing.T) {
+	xml := formatToastXML("agent-badge", "start", "Agent Started", "claude", "agent-notification")
+	if !strings.Contains(xml, "appLogoOverride") {
+		t.Error("agent-badge should have appLogoOverride")
+	}
+	if !strings.Contains(xml, "C") { // claude starts with C
+		t.Error("agent-badge should have agent initial")
+	}
+}
+
+func TestFormatToastXML_Compact(t *testing.T) {
+	xml := formatToastXML("compact", "stop", "claude: stop", "claude", "agent-notification")
+	if strings.Contains(xml, "project") || strings.Contains(xml, "cwd") {
+		t.Error("compact should not include project/cwd")
+	}
+	if strings.Contains(xml, "appLogoOverride") {
+		t.Error("compact should not have appLogoOverride")
+	}
+}
+
+func TestEscapeXML(t *testing.T) {
+	tests := []struct {
+		input    string
+		expected string
+	}{
+		{"&", "&amp;"},
+		{"<", "&lt;"},
+		{">", "&gt;"},
+		{"\"", "&quot;"},
+		{"'", "&apos;"},
+	}
+	for _, tt := range tests {
+		got := escapeXML(tt.input)
+		if got != tt.expected {
+			t.Errorf("escapeXML(%q) = %q, want %q", tt.input, got, tt.expected)
 		}
 	}
 }
