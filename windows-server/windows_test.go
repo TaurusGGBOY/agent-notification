@@ -785,3 +785,42 @@ func TestFormatToastXML_EscapesFields(t *testing.T) {
 		}
 	}
 }
+
+func TestRenderToastCardCreatesPNG(t *testing.T) {
+	path := filepath.Join(t.TempDir(), "toast-card.png")
+	card := ToastCard{
+		Event:   "start",
+		Title:   "Agent Start: claude",
+		Agent:   "claude",
+		Project: "agent-notification",
+		Message: "Task running",
+	}
+	if err := renderToastCard(path, card); err != nil {
+		t.Fatalf("renderToastCard failed: %v", err)
+	}
+	data, err := os.ReadFile(path)
+	if err != nil {
+		t.Fatalf("read png failed: %v", err)
+	}
+	if len(data) < 8 || string(data[:8]) != "\x89PNG\r\n\x1a\n" {
+		t.Fatalf("file is not a png")
+	}
+}
+
+func TestToastCardPathUsesLocalAppData(t *testing.T) {
+	tmp := t.TempDir()
+	oldLocalAppData := os.Getenv("LOCALAPPDATA")
+	os.Setenv("LOCALAPPDATA", tmp)
+	defer os.Setenv("LOCALAPPDATA", oldLocalAppData)
+
+	path, err := toastCardPath()
+	if err != nil {
+		t.Fatalf("toastCardPath failed: %v", err)
+	}
+	if !strings.Contains(path, filepath.Join(tmp, "AgentNotify")) {
+		t.Fatalf("card path should be under local app data, got %s", path)
+	}
+	if filepath.Ext(path) != ".png" {
+		t.Fatalf("card path should be png, got %s", path)
+	}
+}
