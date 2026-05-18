@@ -110,6 +110,29 @@ func (s *Server) ManifestHandler(w http.ResponseWriter, r *http.Request) {
 	json.NewEncoder(w).Encode(resp)
 }
 
+func (s *Server) ToastCardHandler(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodGet {
+		http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
+		return
+	}
+
+	path, err := toastCardPath()
+	if err != nil {
+		http.Error(w, "Failed to get card path", http.StatusInternalServerError)
+		return
+	}
+
+	data, err := os.ReadFile(path)
+	if err != nil {
+		http.Error(w, "Card not found", http.StatusNotFound)
+		return
+	}
+
+	w.Header().Set("Content-Type", "image/png")
+	w.Header().Set("Cache-Control", "no-cache")
+	w.Write(data)
+}
+
 func (s *Server) NotifyHandler(w http.ResponseWriter, r *http.Request) {
 	if r.Method != http.MethodPost {
 		http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
@@ -132,7 +155,8 @@ func (s *Server) NotifyHandler(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	if !s.config.IsEventEnabled(event) {
+	cfg := s.currentConfig()
+	if !cfg.IsEventEnabled(event) {
 		w.WriteHeader(http.StatusNoContent)
 		return
 	}
@@ -141,7 +165,7 @@ func (s *Server) NotifyHandler(w http.ResponseWriter, r *http.Request) {
 	message := formatMessage(payload)
 
 	if err := s.notifier.NotifyWithStyle(
-		s.config.NotificationStyle,
+		cfg.NotificationStyle,
 		event,
 		title,
 		message,
@@ -151,6 +175,16 @@ func (s *Server) NotifyHandler(w http.ResponseWriter, r *http.Request) {
 	}
 
 	w.WriteHeader(http.StatusNoContent)
+}
+
+func (s *Server) currentConfig() *Config {
+	cfg, err := LoadConfig()
+	if err != nil {
+		log.Printf("Failed to reload config: %v", err)
+		return s.config
+	}
+	s.config = cfg
+	return cfg
 }
 
 func formatTitle(agent, event string) string {

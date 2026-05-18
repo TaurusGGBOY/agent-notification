@@ -10,11 +10,11 @@ import (
 )
 
 const settingsHTML = `<!DOCTYPE html>
-<html lang="en">
+<html lang="zh-CN">
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>AgentNotify Settings</title>
+<title>AgentNotify 设置</title>
 <style>
 *{box-sizing:border-box;margin:0;padding:0}
 body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif;background:#1a1a2e;color:#eee;min-height:100vh;padding:2rem}
@@ -63,46 +63,46 @@ h2{color:#fff;font-size:1.1rem;margin:1.5rem 0 .75rem}
 </style>
 </head>
 <body>
-<h1>AgentNotify Settings</h1>
+<h1>AgentNotify 设置</h1>
 
 <div class="status">
-<div class="status-item"><span>Status</span><strong id="serverStatus">Loading...</strong></div>
-<div class="status-item"><span>HTTP URL</span><strong>http://localhost:17891</strong></div>
-<div class="status-item"><span>UDP Discovery</span><strong>Port 17892</strong></div>
-<div class="status-item"><span>Config Path</span><strong id="configPath">Loading...</strong></div>
+<div class="status-item"><span>状态</span><strong id="serverStatus">加载中...</strong></div>
+<div class="status-item"><span>HTTP 地址</span><strong>http://localhost:17891</strong></div>
+<div class="status-item"><span>UDP 发现</span><strong>端口 17892</strong></div>
+<div class="status-item"><span>配置文件</span><strong id="configPath">加载中...</strong></div>
 </div>
 
-<h2>Notification Style</h2>
+<h2>通知样式</h2>
 <div class="card-grid" id="styleGrid">
 <div class="preset-card selected" data-style="clean" onclick="selectStyle('clean')">
-<h3>🧹 Clean</h3>
-<p>Minimal, distraction-free</p>
+<h3>🧹 简洁</h3>
+<p>无干扰，最小化</p>
 </div>
 <div class="preset-card" data-style="status-color" onclick="selectStyle('status-color')">
-<h3>🎨 Status Color</h3>
-<p>Color-coded by event type</p>
+<h3>🎨 状态颜色</h3>
+<p>根据事件类型着色</p>
 </div>
 <div class="preset-card" data-style="agent-badge" onclick="selectStyle('agent-badge')">
-<h3>🏷️ Agent Badge</h3>
-<p>Shows agent avatar</p>
+<h3>🏷️ 代理徽章</h3>
+<p>显示代理头像</p>
 </div>
 <div class="preset-card" data-style="compact" onclick="selectStyle('compact')">
-<h3>📦 Compact</h3>
-<p>Minimal footprint</p>
+<h3>📦 紧凑</h3>
+<p>占用空间最小</p>
 </div>
 <div class="preset-card" data-style="custom-card" onclick="selectStyle('custom-card')">
-<h3>🎴 Custom Card</h3>
-<p>Generated image card inside native Windows toast</p>
+<h3>🎴 自定义卡片</h3>
+<p>生成的图片卡片嵌入原生 Windows 通知</p>
 </div>
 </div>
 
-<h2>Enabled Events</h2>
+<h2>启用事件</h2>
 <div class="toggles">
-<button class="toggle-btn start active" id="toggleStart" onclick="toggleEvent('start')">▶ Start Events</button>
-<button class="toggle-btn stop active" id="toggleStop" onclick="toggleEvent('stop')">⏹ Stop Events</button>
+<button class="toggle-btn start active" id="toggleStart" onclick="toggleEvent('start')">▶ 启动事件</button>
+<button class="toggle-btn stop active" id="toggleStop" onclick="toggleEvent('stop')">⏹ 停止事件</button>
 </div>
 
-<h2>Preview</h2>
+<h2>预览</h2>
 <div class="preview">
 <div class="toast-preview clean" id="previewStart">
 <div class="toast-title">🚀 Agent Start: claude</div>
@@ -115,8 +115,8 @@ h2{color:#fff;font-size:1.1rem;margin:1.5rem 0 .75rem}
 </div>
 
 <div class="actions">
-<button class="btn btn-primary" onclick="sendTestToast()">🔔 Send Test Toast</button>
-<button class="btn btn-secondary" onclick="saveSettings()">💾 Save Settings</button>
+<button class="btn btn-primary" onclick="sendTestToast()">🔔 发送测试通知</button>
+<button class="btn btn-secondary" onclick="saveSettings()">💾 保存设置</button>
 </div>
 
 <div id="toastResult" class="hidden"></div>
@@ -130,7 +130,7 @@ async function loadConfig() {
     if (res.ok) config = await res.json();
   } catch(e) {}
 
-  document.getElementById('serverStatus').textContent = 'Running';
+  document.getElementById('serverStatus').textContent = '运行中';
   document.getElementById('configPath').textContent = config._path || '%APPDATA%\\AgentNotify\\config.json';
 
   document.querySelectorAll('.preset-card').forEach(c => {
@@ -183,8 +183,8 @@ function updatePreview() {
   } else if (style === 'custom-card') {
     previewStart.className = 'toast-preview custom-card';
     previewStop.className = 'toast-preview custom-card stop';
-    previewStart.innerHTML = '<div class="toast-title">🚀 Agent Start: claude</div><div class="toast-message">agent-notification</div><div class="toast-message">Custom hero card image</div>';
-    previewStop.innerHTML = '<div class="toast-title">⏹️ Agent Stop: claude</div><div class="toast-message">agent-notification</div><div class="toast-message">Custom hero card image</div>';
+    previewStart.innerHTML = '<img src="/toast-card.png?v=' + Date.now() + '" style="max-width:364px;border-radius:6px;" />';
+    previewStop.innerHTML = '<img src="/toast-card.png?v=' + Date.now() + '" style="max-width:364px;border-radius:6px;" />';
   } else {
     previewStart.innerHTML = '<div class="toast-title">🚀 Agent Start: claude</div><div class="toast-message">Project: my-project | CWD: ~/code</div>';
     previewStop.innerHTML = '<div class="toast-title">⏹️ Agent Stop: claude</div><div class="toast-message">Project: my-project | CWD: ~/code</div>';
@@ -204,7 +204,7 @@ async function saveSettings() {
       headers:{'Content-Type':'application/json'},
       body: JSON.stringify(saveData)
     });
-    showResult(res.ok ? 'Settings saved successfully!' : 'Failed to save settings', !res.ok);
+    showResult(res.ok ? '设置已保存！' : '保存设置失败', !res.ok);
   } catch(e) {
     showResult('Error: ' + e.message, true);
   }
@@ -225,7 +225,7 @@ async function sendTestToast() {
         sourcePayload:{}
       })
     });
-    showResult(res.ok ? 'Test toast sent!' : 'Failed to send toast', !res.ok);
+    showResult(res.ok ? '测试通知已发送！' : '发送通知失败', !res.ok);
   } catch(e) {
     showResult('Error: ' + e.message, true);
   }

@@ -3,6 +3,7 @@ package main
 import (
 	"bytes"
 	"encoding/json"
+	"image/png"
 	"net/http"
 	"net/http/httptest"
 	"os"
@@ -10,6 +11,26 @@ import (
 	"strings"
 	"testing"
 )
+
+type recordingNotifier struct {
+	calls []recordedNotification
+}
+
+type recordedNotification struct {
+	style string
+	event string
+	title string
+}
+
+func (n *recordingNotifier) Notify(title, message string) error {
+	n.calls = append(n.calls, recordedNotification{title: title})
+	return nil
+}
+
+func (n *recordingNotifier) NotifyWithStyle(style, event, title, message, agent string) error {
+	n.calls = append(n.calls, recordedNotification{style: style, event: event, title: title})
+	return nil
+}
 
 // === Payload Validation Tests ===
 
@@ -157,6 +178,46 @@ func TestNotifyHandler_DisabledEvent(t *testing.T) {
 
 	if w.Code != http.StatusNoContent {
 		t.Errorf("expected status %d for disabled event, got %d", http.StatusNoContent, w.Code)
+	}
+}
+
+func TestNotifyHandler_ReloadsConfigForStyleChanges(t *testing.T) {
+	tmpDir := t.TempDir()
+	oldAppData := os.Getenv("APPDATA")
+	os.Setenv("APPDATA", tmpDir)
+	defer os.Setenv("APPDATA", oldAppData)
+
+	configDir := filepath.Join(tmpDir, "AgentNotify")
+	if err := os.MkdirAll(configDir, 0755); err != nil {
+		t.Fatalf("mkdir config dir failed: %v", err)
+	}
+	configJSON := `{"notificationStyle":"custom-card","enabledEvents":["start","stop"],"futureOverrides":{}}`
+	if err := os.WriteFile(filepath.Join(configDir, "config.json"), []byte(configJSON), 0644); err != nil {
+		t.Fatalf("write config failed: %v", err)
+	}
+
+	server := NewServer(&Config{
+		NotificationStyle: "clean",
+		EnabledEvents:     []string{"start", "stop"},
+		FutureOverrides:   map[string]string{},
+	})
+	notifier := &recordingNotifier{}
+	server.notifier = notifier
+
+	body := `{"agent":"claude","event":"start","project":"agent-notification"}`
+	req := httptest.NewRequest(http.MethodPost, "/notify", bytes.NewBufferString(body))
+	w := httptest.NewRecorder()
+
+	server.NotifyHandler(w, req)
+
+	if w.Code != http.StatusNoContent {
+		t.Fatalf("expected status %d, got %d", http.StatusNoContent, w.Code)
+	}
+	if len(notifier.calls) != 1 {
+		t.Fatalf("expected 1 notification, got %d", len(notifier.calls))
+	}
+	if notifier.calls[0].style != "custom-card" {
+		t.Fatalf("style = %q, want custom-card", notifier.calls[0].style)
 	}
 }
 
@@ -438,7 +499,7 @@ func TestSettingsHandler_GET(t *testing.T) {
 	}
 
 	body := w.Body.String()
-	if !bytes.Contains([]byte(body), []byte("AgentNotify Settings")) {
+	if !bytes.Contains([]byte(body), []byte("AgentNotify 设置")) {
 		t.Error("expected HTML title in response")
 	}
 }
@@ -804,6 +865,33 @@ func TestRenderToastCardCreatesPNG(t *testing.T) {
 	}
 	if len(data) < 8 || string(data[:8]) != "\x89PNG\r\n\x1a\n" {
 		t.Fatalf("file is not a png")
+	}
+}
+
+func TestRenderToastCardCreatesHighResolutionPNG(t *testing.T) {
+	path := filepath.Join(t.TempDir(), "toast-card.png")
+	card := ToastCard{
+		Event:   "start",
+		Title:   "Agent Start: claude",
+		Agent:   "claude",
+		Project: "agent-notification",
+		Message: "Task running",
+	}
+	if err := renderToastCard(path, card); err != nil {
+		t.Fatalf("renderToastCard failed: %v", err)
+	}
+	file, err := os.Open(path)
+	if err != nil {
+		t.Fatalf("open png failed: %v", err)
+	}
+	defer file.Close()
+	img, err := png.Decode(file)
+	if err != nil {
+		t.Fatalf("decode png failed: %v", err)
+	}
+	got := img.Bounds().Size()
+	if got.X != 1456 || got.Y != 720 {
+		t.Fatalf("png size = %dx%d, want 1456x720", got.X, got.Y)
 	}
 }
 
