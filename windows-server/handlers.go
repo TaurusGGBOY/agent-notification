@@ -19,7 +19,7 @@ func supportedEvents() []string {
 }
 
 func supportedStyles() []string {
-	return []string{"clean", "status-color", "agent-badge", "compact"}
+	return []string{"clean", "status-color", "agent-badge", "compact", "custom-card"}
 }
 
 func localHostname() string {

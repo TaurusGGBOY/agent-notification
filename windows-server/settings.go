@@ -54,6 +54,8 @@ h2{color:#fff;font-size:1.1rem;margin:1.5rem 0 .75rem}
 .toast-title{color:#fff;font-weight:600;margin-bottom:.25rem}
 .toast-message{color:#aaa;font-size:.9rem}
 .toast-preview.agent-badge .toast-title{color:#00d4ff}
+.toast-preview.custom-card{background:#121826;border-left:8px solid #4ade80;padding:1rem 1rem 1rem 1.25rem}
+.toast-preview.custom-card.stop{border-left-color:#f87171}
 .hidden{display:none}
 #toastResult{margin-top:1rem;padding:1rem;border-radius:6px}
 #toastResult.success{background:#1e5128;color:#4ade80}
@@ -87,6 +89,10 @@ h2{color:#fff;font-size:1.1rem;margin:1.5rem 0 .75rem}
 <div class="preset-card" data-style="compact" onclick="selectStyle('compact')">
 <h3>📦 Compact</h3>
 <p>Minimal footprint</p>
+</div>
+<div class="preset-card" data-style="custom-card" onclick="selectStyle('custom-card')">
+<h3>🎴 Custom Card</h3>
+<p>Generated image card inside native Windows toast</p>
 </div>
 </div>
 
@@ -174,6 +180,11 @@ function updatePreview() {
   } else if (style === 'status-color') {
     previewStart.innerHTML = '<div class="toast-title" style="color:#4ade80">🚀 Agent Start: claude</div><div class="toast-message">Project: my-project | CWD: ~/code</div>';
     previewStop.innerHTML = '<div class="toast-title" style="color:#f87171">⏹️ Agent Stop: claude</div><div class="toast-message">Project: my-project | CWD: ~/code</div>';
+  } else if (style === 'custom-card') {
+    previewStart.className = 'toast-preview custom-card';
+    previewStop.className = 'toast-preview custom-card stop';
+    previewStart.innerHTML = '<div class="toast-title">🚀 Agent Start: claude</div><div class="toast-message">agent-notification</div><div class="toast-message">Custom hero card image</div>';
+    previewStop.innerHTML = '<div class="toast-title">⏹️ Agent Stop: claude</div><div class="toast-message">agent-notification</div><div class="toast-message">Custom hero card image</div>';
   } else {
     previewStart.innerHTML = '<div class="toast-title">🚀 Agent Start: claude</div><div class="toast-message">Project: my-project | CWD: ~/code</div>';
     previewStop.innerHTML = '<div class="toast-title">⏹️ Agent Stop: claude</div><div class="toast-message">Project: my-project | CWD: ~/code</div>';
@@ -355,6 +366,7 @@ var validStyles = map[string]bool{
 	"status-color": true,
 	"agent-badge":  true,
 	"compact":      true,
+	"custom-card":  true,
 }
 
 var validEvents = map[string]bool{

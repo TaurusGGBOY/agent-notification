@@ -396,7 +396,7 @@ func TestManifestResponse_Fields(t *testing.T) {
 		ServiceType:     "_agent-notify._tcp.local.",
 		Description:     "Windows notification server",
 		SupportedEvents: []string{"start", "stop"},
-		SupportedStyles: []string{"clean", "status-color", "agent-badge", "compact"},
+		SupportedStyles: []string{"clean", "status-color", "agent-badge", "compact", "custom-card"},
 	}
 
 	data, err := json.Marshal(resp)
@@ -521,7 +521,7 @@ func TestSettingsHandler_WrongMethod(t *testing.T) {
 // === Style Validation Tests ===
 
 func TestIsValidStyle(t *testing.T) {
-	validStyles := []string{"clean", "status-color", "agent-badge", "compact"}
+	validStyles := []string{"clean", "status-color", "agent-badge", "compact", "custom-card"}
 	invalidStyles := []string{"invalid", "fancy", "", "CLEAN"}
 
 	for _, s := range validStyles {
