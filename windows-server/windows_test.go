@@ -720,60 +720,68 @@ func TestSettingsHandler_InvalidEventNotSaved(t *testing.T) {
 // === XML Generation Tests ===
 
 func TestFormatToastXML_Clean(t *testing.T) {
-	xml := formatToastXML("clean", "start", "Agent Started", "claude", "agent-notification")
-	if !strings.Contains(xml, "ToastGeneric") {
+	xml := formatToastXML("clean", "start", "Agent Started", "claude", "agent-notification", "")
+	if !strings.Contains(xml, `template="ToastGeneric"`) {
 		t.Error("clean style should use ToastGeneric template")
 	}
-	if strings.Contains(xml, "appLogoOverride") {
-		t.Error("clean style should not have appLogoOverride")
+	if strings.Contains(xml, `placement="hero"`) {
+		t.Error("clean style should not use hero image")
 	}
 }
 
 func TestFormatToastXML_StatusColor(t *testing.T) {
-	xml := formatToastXML("status-color", "stop", "Agent Stopped", "claude", "agent-notification")
-	if !strings.Contains(xml, "appLogoOverride") {
-		t.Error("status-color should have appLogoOverride")
+	xml := formatToastXML("status-color", "stop", "Agent Stopped", "claude", "agent-notification", "")
+	if !strings.Contains(xml, `placement="attribution"`) {
+		t.Error("status-color should have attribution text")
 	}
 	if !strings.Contains(xml, "Stopped") {
-		t.Error("status-color should have attribution text")
+		t.Error("status-color should include stopped attribution")
 	}
 }
 
 func TestFormatToastXML_AgentBadge(t *testing.T) {
-	xml := formatToastXML("agent-badge", "start", "Agent Started", "claude", "agent-notification")
-	if !strings.Contains(xml, "appLogoOverride") {
-		t.Error("agent-badge should have appLogoOverride")
-	}
-	if !strings.Contains(xml, "C") { // claude starts with C
-		t.Error("agent-badge should have agent initial")
+	xml := formatToastXML("agent-badge", "start", "Agent Started", "claude", "agent-notification", "")
+	if !strings.Contains(xml, "Agent C") {
+		t.Error("agent-badge should include agent initial attribution")
 	}
 }
 
 func TestFormatToastXML_Compact(t *testing.T) {
-	xml := formatToastXML("compact", "stop", "claude: stop", "claude", "agent-notification")
-	if strings.Contains(xml, "project") || strings.Contains(xml, "cwd") {
-		t.Error("compact should not include project/cwd")
+	xml := formatToastXML("compact", "stop", "claude: stop", "claude", "agent-notification", "")
+	if strings.Contains(xml, "agent-notification") {
+		t.Error("compact should not include project")
 	}
-	if strings.Contains(xml, "appLogoOverride") {
-		t.Error("compact should not have appLogoOverride")
+	if strings.Contains(xml, `placement="hero"`) {
+		t.Error("compact should not use hero image")
 	}
 }
 
-func TestEscapeXML(t *testing.T) {
-	tests := []struct {
-		input    string
-		expected string
-	}{
-		{"&", "&amp;"},
-		{"<", "&lt;"},
-		{">", "&gt;"},
-		{"\"", "&quot;"},
-		{"'", "&apos;"},
+func TestFormatToastXML_CustomCardUsesHeroImage(t *testing.T) {
+	xml := formatToastXML("custom-card", "start", "Agent Started", "claude", "agent-notification", `C:\Users\me\AppData\Local\AgentNotify\toast-card.png`)
+	if !strings.Contains(xml, `template="ToastGeneric"`) {
+		t.Error("custom-card should use ToastGeneric template")
 	}
-	for _, tt := range tests {
-		got := escapeXML(tt.input)
-		if got != tt.expected {
-			t.Errorf("escapeXML(%q) = %q, want %q", tt.input, got, tt.expected)
+	if !strings.Contains(xml, `placement="hero"`) {
+		t.Error("custom-card should use a hero image")
+	}
+	if !strings.Contains(xml, `toast-card.png`) {
+		t.Error("custom-card should include generated card image path")
+	}
+	if !strings.Contains(xml, "Agent Started") {
+		t.Error("custom-card should keep native fallback text")
+	}
+}
+
+func TestFormatToastXML_EscapesFields(t *testing.T) {
+	xml := formatToastXML("clean", "start", `Agent <Started> & "Ready"`, "claude", "a'b", "")
+	for _, raw := range []string{`<Started>`, `"Ready"`, "a'b"} {
+		if strings.Contains(xml, raw) {
+			t.Fatalf("xml contains unescaped raw field %q: %s", raw, xml)
+		}
+	}
+	for _, escaped := range []string{"&lt;Started&gt;", "&amp;", "&quot;Ready&quot;", "a&apos;b"} {
+		if !strings.Contains(xml, escaped) {
+			t.Fatalf("xml missing escaped field %q: %s", escaped, xml)
 		}
 	}
 }
