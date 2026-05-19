@@ -1,0 +1,61 @@
+:root {
+  color-scheme: light dark;
+  font-family: "Segoe UI", system-ui, sans-serif;
+  background: #f6f7f9;
+  color: #1f2328;
+}
+
+@media (prefers-color-scheme: dark) {
+  :root {
+    background: #0f141b;
+    color: #f8fafc;
+  }
+}
+
+* {
+  box-sizing: border-box;
+}
+
+body {
+  margin: 0;
+  min-width: 420px;
+  min-height: 540px;
+}
+
+.shell {
+  padding: 18px;
+}
+
+.topbar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 14px;
+}
+
+h1 {
+  margin: 0;
+  font-size: 17px;
+}
+
+p {
+  margin: 0;
+  color: #667085;
+  font-size: 12px;
+}
+
+.status {
+  border: 1px solid #bde8ce;
+  border-radius: 999px;
+  color: #0f7a43;
+  background: #e8f7ef;
+  font-size: 12px;
+  padding: 5px 9px;
+}
+
+.panel {
+  border: 1px solid color-mix(in srgb, currentColor 14%, transparent);
+  border-radius: 12px;
+  padding: 14px;
+  background: color-mix(in srgb, Canvas 92%, currentColor 3%);
+}
