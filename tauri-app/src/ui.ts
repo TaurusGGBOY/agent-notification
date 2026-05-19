@@ -1,4 +1,4 @@
-import { saveConfig, sendTestNotification, type EventName, type NotificationStyle } from "./api";
+import { restartService, saveConfig, sendTestNotification, type EventName, type NotificationStyle } from "./api";
 import { runCommand } from "./commands";
 import { refreshState } from "./service";
 import { state } from "./state";
@@ -88,6 +88,7 @@ export function render(): void {
             <dd>${state.manifest?.version ?? "unknown"}</dd>
           </dl>
           <button class="primary block" data-action="test">Test</button>
+          <button class="block" data-action="restart">Restart</button>
           <button class="block" data-action="refresh">Refresh</button>
         </aside>
       </section>
@@ -139,6 +140,12 @@ function bindEvents(): void {
 
   document.querySelector<HTMLButtonElement>('[data-action="test"]')?.addEventListener("click", async () => {
     await sendTestNotification("start");
+  });
+
+  document.querySelector<HTMLButtonElement>('[data-action="restart"]')?.addEventListener("click", async () => {
+    await restartService();
+    await refreshState();
+    render();
   });
 
   document.querySelector<HTMLButtonElement>('[data-action="refresh"]')?.addEventListener("click", async () => {

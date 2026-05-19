@@ -1,4 +1,5 @@
 import {
+  restartService,
   saveConfig,
   sendTestNotification,
   type AgentConfig,
@@ -30,6 +31,11 @@ export async function runCommand(input: string, config: AgentConfig | null): Pro
   }
 
   if (!config) return { message: "Config is not loaded yet" };
+
+  if (command === "restart") {
+    await restartService();
+    return { message: "Restarted service" };
+  }
 
   if (command === "pause") {
     const next = { ...config, enabledEvents: [] as EventName[] };
