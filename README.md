@@ -68,6 +68,16 @@ POST /notify
 }
 ```
 
+## Desktop Client
+
+The Tauri client lives in `tauri-app/`. It bundles the Go server as a sidecar, adds a system tray, and provides the command-first notification client UI.
+
+```bash
+cd tauri-app
+npm install
+npm run tauri:dev
+```
+
 ## Build from macOS
 
 ```bash
