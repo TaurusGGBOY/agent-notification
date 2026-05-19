@@ -19,7 +19,7 @@ func supportedEvents() []string {
 }
 
 func supportedStyles() []string {
-	return []string{"clean", "status-color", "agent-badge", "compact", "custom-card"}
+	return []string{"clean", "status-color", "agent-badge", "compact"}
 }
 
 func localHostname() string {
@@ -108,29 +108,6 @@ func (s *Server) ManifestHandler(w http.ResponseWriter, r *http.Request) {
 
 	w.Header().Set("Content-Type", "application/json")
 	json.NewEncoder(w).Encode(resp)
-}
-
-func (s *Server) ToastCardHandler(w http.ResponseWriter, r *http.Request) {
-	if r.Method != http.MethodGet {
-		http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
-		return
-	}
-
-	path, err := toastCardPath()
-	if err != nil {
-		http.Error(w, "Failed to get card path", http.StatusInternalServerError)
-		return
-	}
-
-	data, err := os.ReadFile(path)
-	if err != nil {
-		http.Error(w, "Card not found", http.StatusNotFound)
-		return
-	}
-
-	w.Header().Set("Content-Type", "image/png")
-	w.Header().Set("Cache-Control", "no-cache")
-	w.Write(data)
 }
 
 func (s *Server) NotifyHandler(w http.ResponseWriter, r *http.Request) {

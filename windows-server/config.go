@@ -61,7 +61,7 @@ func (c *Config) IsEventEnabled(event string) bool {
 }
 
 func IsSupportedStyle(style string) bool {
-	for _, supported := range []string{"clean", "status-color", "agent-badge", "compact", "custom-card"} {
+	for _, supported := range []string{"clean", "status-color", "agent-badge", "compact"} {
 		if style == supported {
 			return true
 		}

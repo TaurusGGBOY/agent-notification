@@ -35,7 +35,6 @@ func main() {
 	http.HandleFunc("/health", server.HealthHandler)
 	http.HandleFunc("/manifest", server.ManifestHandler)
 	http.HandleFunc("/notify", server.NotifyHandler)
-	http.HandleFunc("/toast-card.png", server.ToastCardHandler)
 	http.Handle("/settings", NewSettingsHandler())
 	http.Handle("/config", &ConfigHandler{})
 

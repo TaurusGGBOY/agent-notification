@@ -3,7 +3,6 @@ package main
 import (
 	"bytes"
 	"encoding/json"
-	"image/png"
 	"net/http"
 	"net/http/httptest"
 	"os"
@@ -191,7 +190,7 @@ func TestNotifyHandler_ReloadsConfigForStyleChanges(t *testing.T) {
 	if err := os.MkdirAll(configDir, 0755); err != nil {
 		t.Fatalf("mkdir config dir failed: %v", err)
 	}
-	configJSON := `{"notificationStyle":"custom-card","enabledEvents":["start","stop"],"futureOverrides":{}}`
+	configJSON := `{"notificationStyle":"agent-badge","enabledEvents":["start","stop"],"futureOverrides":{}}`
 	if err := os.WriteFile(filepath.Join(configDir, "config.json"), []byte(configJSON), 0644); err != nil {
 		t.Fatalf("write config failed: %v", err)
 	}
@@ -216,8 +215,8 @@ func TestNotifyHandler_ReloadsConfigForStyleChanges(t *testing.T) {
 	if len(notifier.calls) != 1 {
 		t.Fatalf("expected 1 notification, got %d", len(notifier.calls))
 	}
-	if notifier.calls[0].style != "custom-card" {
-		t.Fatalf("style = %q, want custom-card", notifier.calls[0].style)
+	if notifier.calls[0].style != "agent-badge" {
+		t.Fatalf("style = %q, want agent-badge", notifier.calls[0].style)
 	}
 }
 
@@ -457,7 +456,7 @@ func TestManifestResponse_Fields(t *testing.T) {
 		ServiceType:     "_agent-notify._tcp.local.",
 		Description:     "Windows notification server",
 		SupportedEvents: []string{"start", "stop"},
-		SupportedStyles: []string{"clean", "status-color", "agent-badge", "compact", "custom-card"},
+		SupportedStyles: []string{"clean", "status-color", "agent-badge", "compact"},
 	}
 
 	data, err := json.Marshal(resp)
@@ -582,7 +581,7 @@ func TestSettingsHandler_WrongMethod(t *testing.T) {
 // === Style Validation Tests ===
 
 func TestIsValidStyle(t *testing.T) {
-	validStyles := []string{"clean", "status-color", "agent-badge", "compact", "custom-card"}
+	validStyles := []string{"clean", "status-color", "agent-badge", "compact"}
 	invalidStyles := []string{"invalid", "fancy", "", "CLEAN"}
 
 	for _, s := range validStyles {
@@ -817,22 +816,6 @@ func TestFormatToastXML_Compact(t *testing.T) {
 	}
 }
 
-func TestFormatToastXML_CustomCardUsesHeroImage(t *testing.T) {
-	xml := formatToastXML("custom-card", "start", "Agent Started", "claude", "agent-notification", `C:\Users\me\AppData\Local\AgentNotify\toast-card.png`)
-	if !strings.Contains(xml, `template="ToastGeneric"`) {
-		t.Error("custom-card should use ToastGeneric template")
-	}
-	if !strings.Contains(xml, `placement="hero"`) {
-		t.Error("custom-card should use a hero image")
-	}
-	if !strings.Contains(xml, `toast-card.png`) {
-		t.Error("custom-card should include generated card image path")
-	}
-	if !strings.Contains(xml, "Agent Started") {
-		t.Error("custom-card should keep native fallback text")
-	}
-}
-
 func TestFormatToastXML_EscapesFields(t *testing.T) {
 	xml := formatToastXML("clean", "start", `Agent <Started> & "Ready"`, "claude", "a'b", "")
 	for _, raw := range []string{`<Started>`, `"Ready"`, "a'b"} {
@@ -844,71 +827,5 @@ func TestFormatToastXML_EscapesFields(t *testing.T) {
 		if !strings.Contains(xml, escaped) {
 			t.Fatalf("xml missing escaped field %q: %s", escaped, xml)
 		}
-	}
-}
-
-func TestRenderToastCardCreatesPNG(t *testing.T) {
-	path := filepath.Join(t.TempDir(), "toast-card.png")
-	card := ToastCard{
-		Event:   "start",
-		Title:   "Agent Start: claude",
-		Agent:   "claude",
-		Project: "agent-notification",
-		Message: "Task running",
-	}
-	if err := renderToastCard(path, card); err != nil {
-		t.Fatalf("renderToastCard failed: %v", err)
-	}
-	data, err := os.ReadFile(path)
-	if err != nil {
-		t.Fatalf("read png failed: %v", err)
-	}
-	if len(data) < 8 || string(data[:8]) != "\x89PNG\r\n\x1a\n" {
-		t.Fatalf("file is not a png")
-	}
-}
-
-func TestRenderToastCardCreatesHighResolutionPNG(t *testing.T) {
-	path := filepath.Join(t.TempDir(), "toast-card.png")
-	card := ToastCard{
-		Event:   "start",
-		Title:   "Agent Start: claude",
-		Agent:   "claude",
-		Project: "agent-notification",
-		Message: "Task running",
-	}
-	if err := renderToastCard(path, card); err != nil {
-		t.Fatalf("renderToastCard failed: %v", err)
-	}
-	file, err := os.Open(path)
-	if err != nil {
-		t.Fatalf("open png failed: %v", err)
-	}
-	defer file.Close()
-	img, err := png.Decode(file)
-	if err != nil {
-		t.Fatalf("decode png failed: %v", err)
-	}
-	got := img.Bounds().Size()
-	if got.X != 1456 || got.Y != 720 {
-		t.Fatalf("png size = %dx%d, want 1456x720", got.X, got.Y)
-	}
-}
-
-func TestToastCardPathUsesLocalAppData(t *testing.T) {
-	tmp := t.TempDir()
-	oldLocalAppData := os.Getenv("LOCALAPPDATA")
-	os.Setenv("LOCALAPPDATA", tmp)
-	defer os.Setenv("LOCALAPPDATA", oldLocalAppData)
-
-	path, err := toastCardPath()
-	if err != nil {
-		t.Fatalf("toastCardPath failed: %v", err)
-	}
-	if !strings.Contains(path, filepath.Join(tmp, "AgentNotify")) {
-		t.Fatalf("card path should be under local app data, got %s", path)
-	}
-	if filepath.Ext(path) != ".png" {
-		t.Fatalf("card path should be png, got %s", path)
 	}
 }
