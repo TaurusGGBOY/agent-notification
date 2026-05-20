@@ -1,8 +1,10 @@
 import "./styles.css";
 import { refreshState } from "./service";
+import { applyTheme, getInitialTheme } from "./theme";
 import { render } from "./ui";
 
 async function boot() {
+  applyTheme(getInitialTheme());
   await refreshState();
   render();
 }
