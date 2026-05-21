@@ -69,7 +69,7 @@ button {
 
 .app-shell {
   display: grid;
-  grid-template-columns: 246px minmax(0, 1fr);
+  grid-template-columns: 236px minmax(0, 1fr);
   width: 100vw;
   height: 100vh;
   background: var(--surface);
@@ -80,7 +80,7 @@ button {
   display: flex;
   flex-direction: column;
   min-width: 0;
-  padding: 22px 12px 14px;
+  padding: 26px 14px 18px;
   background: var(--sidebar);
   border-right: 1px solid var(--border);
 }
@@ -89,7 +89,7 @@ button {
   display: flex;
   align-items: center;
   gap: 12px;
-  padding: 0 10px 26px;
+  padding: 0 10px 22px;
 }
 
 .brand-icon,
@@ -111,7 +111,7 @@ button {
 
 .brand strong {
   display: block;
-  font-size: 20px;
+  font-size: 22px;
   line-height: 1.1;
 }
 
@@ -119,39 +119,33 @@ button {
   display: block;
   margin-top: 4px;
   color: var(--muted);
-  font-size: 12px;
+  font-size: 13px;
 }
 
-.side-nav {
+.side-summary {
   display: grid;
-  gap: 8px;
+  gap: 10px;
 }
 
-.nav-item {
-  display: grid;
-  grid-template-columns: 40px 1fr;
+.side-summary div {
+  display: flex;
   align-items: center;
-  min-height: 60px;
-  border: 0;
-  border-radius: 8px;
-  padding: 0 12px;
-  background: transparent;
+  justify-content: space-between;
+  min-height: 58px;
+  padding: 0 14px;
+  border: 1px solid var(--border);
+  border-radius: 9px;
+  background: var(--card);
+}
+
+.side-summary span {
+  color: var(--muted);
+  font-size: 14px;
+}
+
+.side-summary strong {
   color: var(--text);
-  text-align: left;
-}
-
-.nav-item span {
-  font-size: 22px;
-}
-
-.nav-item strong {
-  font-size: 17px;
-  letter-spacing: 0;
-}
-
-.nav-item.active {
-  background: var(--primary-soft);
-  color: var(--text);
+  font-size: 16px;
 }
 
 .traffic-card {
@@ -197,8 +191,8 @@ button {
 
 .main-surface {
   min-width: 0;
-  overflow: auto;
-  padding: 26px 24px 24px;
+  overflow: hidden;
+  padding: 24px;
 }
 
 .topbar {
@@ -206,19 +200,20 @@ button {
   align-items: flex-start;
   justify-content: space-between;
   gap: 16px;
-  margin-bottom: 20px;
+  height: 70px;
+  margin-bottom: 14px;
 }
 
 .topbar h1 {
   margin: 0;
-  font-size: 28px;
+  font-size: 32px;
   line-height: 1.15;
 }
 
 .topbar p {
   margin: 6px 0 0;
   color: var(--muted);
-  font-size: 13px;
+  font-size: 14px;
 }
 
 .top-actions {
@@ -231,8 +226,8 @@ button {
 .command-box {
   display: flex;
   align-items: center;
-  width: 270px;
-  height: 38px;
+  width: 310px;
+  height: 42px;
   padding: 0 12px;
   border: 1px solid var(--border);
   border-radius: 8px;
@@ -251,12 +246,12 @@ button {
   outline: 0;
   background: transparent;
   color: var(--text);
-  font-size: 13px;
+  font-size: 14px;
 }
 
 .icon-button {
-  width: 38px;
-  height: 38px;
+  width: 42px;
+  height: 42px;
   border: 1px solid var(--border);
   border-radius: 8px;
   background: var(--card);
@@ -267,13 +262,13 @@ button {
 .service-pill {
   display: inline-flex;
   align-items: center;
-  height: 38px;
+  height: 42px;
   padding: 0 14px;
   border: 1px solid var(--border);
   border-radius: 999px;
   background: var(--card);
   color: var(--muted);
-  font-size: 13px;
+  font-size: 14px;
   white-space: nowrap;
 }
 
@@ -313,16 +308,21 @@ button {
 .dashboard-grid {
   display: grid;
   grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
-  gap: 14px;
+  grid-template-rows: repeat(3, minmax(0, 1fr));
+  gap: 12px;
+  height: calc(100vh - 108px);
+  min-height: 0;
 }
 
 .card {
   min-width: 0;
+  min-height: 0;
+  overflow: hidden;
   border: 1px solid var(--border);
   border-radius: var(--radius);
   background: var(--card);
   box-shadow: var(--shadow);
-  padding: 20px;
+  padding: 16px 18px;
 }
 
 .wide-card,
@@ -334,13 +334,13 @@ button {
 .card-head {
   display: flex;
   align-items: center;
-  gap: 14px;
-  margin-bottom: 18px;
+  gap: 13px;
+  margin-bottom: 12px;
 }
 
 .card-icon {
-  width: 48px;
-  height: 48px;
+  width: 52px;
+  height: 52px;
   border-radius: 8px;
   font-size: 22px;
 }
@@ -362,21 +362,21 @@ button {
 
 .card h2 {
   margin: 0;
-  font-size: 20px;
+  font-size: 22px;
   line-height: 1.2;
 }
 
 .card p {
   margin: 5px 0 0;
   color: var(--muted);
-  font-size: 13px;
+  font-size: 14px;
 }
 
 .meta-list {
   display: grid;
-  gap: 12px;
+  gap: 9px;
   color: var(--muted);
-  font-size: 13px;
+  font-size: 14px;
 }
 
 .meta-list div,
@@ -397,9 +397,9 @@ button {
 }
 
 .progress-row {
-  margin-top: 16px;
+  margin-top: 12px;
   color: var(--muted);
-  font-size: 13px;
+  font-size: 14px;
 }
 
 .progress-track {
@@ -418,8 +418,8 @@ button {
 }
 
 .select-like {
-  min-height: 52px;
-  margin-top: 10px;
+  min-height: 48px;
+  margin-top: 8px;
   padding: 0 14px;
   border: 1px solid var(--border-strong);
   border-radius: 6px;
@@ -428,21 +428,22 @@ button {
 
 .select-like span {
   color: var(--muted);
-  font-size: 13px;
+  font-size: 14px;
 }
 
 .segmented {
   display: grid;
   grid-template-columns: repeat(5, minmax(0, 1fr));
-  gap: 10px;
+  gap: 8px;
 }
 
 .segment {
-  min-height: 50px;
+  min-height: 48px;
   border: 1px solid transparent;
   border-radius: 8px;
   background: color-mix(in srgb, var(--border) 45%, transparent);
   color: var(--text);
+  font-size: 16px;
   font-weight: 700;
 }
 
@@ -456,16 +457,16 @@ button {
   display: flex;
   align-items: center;
   gap: 14px;
-  min-height: 100px;
-  padding: 16px;
+  min-height: 96px;
+  padding: 14px;
   border: 1px solid var(--border);
   border-radius: 10px;
   background: var(--card-soft);
 }
 
 .toast-logo {
-  width: 52px;
-  height: 52px;
+  width: 54px;
+  height: 54px;
   border-radius: 12px;
   background: var(--success);
   color: #fff;
@@ -479,11 +480,11 @@ button {
 .toast-preview span {
   margin-top: 3px;
   color: var(--muted);
-  font-size: 13px;
+  font-size: 14px;
 }
 
 .toast-preview p {
-  margin-top: 10px;
+  margin-top: 8px;
 }
 
 .toggle-grid {
@@ -496,12 +497,13 @@ button {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  min-height: 54px;
+  min-height: 50px;
   border: 1px solid var(--border);
   border-radius: 8px;
   padding: 0 14px;
   background: var(--card-soft);
   color: var(--text);
+  font-size: 16px;
 }
 
 .event-toggle strong {
@@ -519,11 +521,12 @@ button {
 }
 
 .button-row button {
-  min-height: 42px;
+  min-height: 46px;
   border: 1px solid var(--border);
   border-radius: 8px;
   background: color-mix(in srgb, var(--border) 45%, transparent);
   color: var(--text);
+  font-size: 16px;
   font-weight: 700;
 }
 

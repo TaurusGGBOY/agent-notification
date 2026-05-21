@@ -61,7 +61,7 @@ func (c *Config) IsEventEnabled(event string) bool {
 }
 
 func IsSupportedStyle(style string) bool {
-	for _, supported := range []string{"clean", "status-color", "agent-badge", "compact"} {
+	for _, supported := range []string{"clean", "status-color", "agent-badge", "compact", "custom-card"} {
 		if style == supported {
 			return true
 		}
@@ -77,7 +77,7 @@ func (c *Config) Normalize() {
 	if !IsSupportedStyle(c.NotificationStyle) {
 		c.NotificationStyle = "clean"
 	}
-	if len(c.EnabledEvents) == 0 {
+	if c.EnabledEvents == nil {
 		c.EnabledEvents = []string{"start", "stop"}
 		return
 	}

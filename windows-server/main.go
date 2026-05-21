@@ -16,6 +16,19 @@ func envOrDefault(name, fallback string) string {
 	return value
 }
 
+func withCORS(next http.Handler) http.Handler {
+	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Access-Control-Allow-Origin", "*")
+		w.Header().Set("Access-Control-Allow-Methods", "GET, POST, OPTIONS")
+		w.Header().Set("Access-Control-Allow-Headers", "Content-Type")
+		if r.Method == http.MethodOptions {
+			w.WriteHeader(http.StatusNoContent)
+			return
+		}
+		next.ServeHTTP(w, r)
+	})
+}
+
 func main() {
 	httpAddr := envOrDefault("AGENT_NOTIFY_HTTP_ADDR", "0.0.0.0:17891")
 
@@ -32,15 +45,16 @@ func main() {
 
 	server := NewServer(cfg)
 
-	http.HandleFunc("/health", server.HealthHandler)
-	http.HandleFunc("/manifest", server.ManifestHandler)
-	http.HandleFunc("/notify", server.NotifyHandler)
-	http.Handle("/settings", NewSettingsHandler())
-	http.Handle("/config", &ConfigHandler{})
+	mux := http.NewServeMux()
+	mux.HandleFunc("/health", server.HealthHandler)
+	mux.HandleFunc("/manifest", server.ManifestHandler)
+	mux.HandleFunc("/notify", server.NotifyHandler)
+	mux.Handle("/settings", NewSettingsHandler())
+	mux.Handle("/config", &ConfigHandler{})
 
 	go func() {
 		log.Printf("HTTP server listening on %s", httpAddr)
-		if err := http.ListenAndServe(httpAddr, nil); err != nil {
+		if err := http.ListenAndServe(httpAddr, withCORS(mux)); err != nil {
 			log.Fatalf("HTTP server failed: %v", err)
 		}
 	}()

@@ -1,108 +1,162 @@
 #!/usr/bin/env python3
-"""Capture Windows UI screenshot for agent-notify Tauri client."""
+"""Capture a Windows desktop UI screenshot through an interactive task."""
 
 import argparse
-import subprocess
-import time
+import base64
 import os
-import sys
+import subprocess
+import tempfile
+import textwrap
+import time
 
 
-def run_ssh(host, cmd):
-    result = subprocess.run(
-        ["ssh", host, cmd],
-        capture_output=True,
-        text=True,
-        errors="replace"
+TASK_NAME = "AgentNotifyUIVerify"
+REMOTE_TEMP = r"C:\Users\Administrator\AppData\Local\Temp"
+
+
+def run(args, check=False):
+    result = subprocess.run(args, capture_output=True, text=True, errors="replace")
+    if check and result.returncode != 0:
+        raise RuntimeError(
+            f"command failed: {' '.join(args)}\nstdout:\n{result.stdout}\nstderr:\n{result.stderr}"
+        )
+    return result
+
+
+def ssh(host, command, check=False):
+    return run(["ssh", host, command], check=check)
+
+
+def ps(host, command, check=False):
+    encoded = base64.b64encode(command.encode("utf-16le")).decode("ascii")
+    return ssh(host, f"powershell -NoProfile -EncodedCommand {encoded}", check=check)
+
+
+def write_capture_script(host, exe_path, process_name):
+    remote_script = rf"{REMOTE_TEMP}\agentnotify-ui-capture.ps1"
+    remote_png = rf"{REMOTE_TEMP}\agentnotify-ui-capture.png"
+    remote_info = rf"{REMOTE_TEMP}\agentnotify-ui-capture.info"
+    remote_done = rf"{REMOTE_TEMP}\agentnotify-ui-capture.done"
+
+    script = textwrap.dedent(
+        rf"""
+        $ErrorActionPreference = "Stop"
+        $exe = "{exe_path}"
+        $processName = "{process_name}"
+        $png = "{remote_png}"
+        $info = "{remote_info}"
+        $done = "{remote_done}"
+
+        Remove-Item $png, $info, $done -Force -ErrorAction SilentlyContinue
+        Get-Process $processName -ErrorAction SilentlyContinue | Stop-Process -Force -ErrorAction SilentlyContinue
+
+        Add-Type @"
+        using System;
+        using System.Runtime.InteropServices;
+        public class NativeWin {{
+          [DllImport("user32.dll")]
+          public static extern bool SetForegroundWindow(IntPtr hWnd);
+          [DllImport("user32.dll")]
+          public static extern bool ShowWindow(IntPtr hWnd, int nCmdShow);
+        }}
+"@
+
+        $proc = Start-Process -FilePath $exe -PassThru
+        $hwnd = 0
+        for ($i = 0; $i -lt 20; $i++) {{
+          Start-Sleep -Milliseconds 500
+          $p = Get-Process $processName -ErrorAction SilentlyContinue | Where-Object {{ $_.MainWindowHandle -ne 0 }} | Select-Object -First 1
+          if ($null -ne $p) {{
+            $hwnd = $p.MainWindowHandle
+            [NativeWin]::ShowWindow($hwnd, 9) | Out-Null
+            [NativeWin]::SetForegroundWindow($hwnd) | Out-Null
+            break
+          }}
+        }}
+
+        Start-Sleep -Seconds 5
+        Add-Type -AssemblyName System.Windows.Forms
+        Add-Type -AssemblyName System.Drawing
+        $bounds = [System.Windows.Forms.Screen]::PrimaryScreen.Bounds
+        $bitmap = New-Object System.Drawing.Bitmap($bounds.Width, $bounds.Height)
+        $graphics = [System.Drawing.Graphics]::FromImage($bitmap)
+        try {{
+          $graphics.CopyFromScreen($bounds.Location, [System.Drawing.Point]::Empty, $bounds.Size)
+          $bitmap.Save($png, [System.Drawing.Imaging.ImageFormat]::Png)
+          "hwnd=$hwnd width=$($bounds.Width) height=$($bounds.Height)" | Set-Content -Encoding UTF8 $info
+        }} finally {{
+          $graphics.Dispose()
+          $bitmap.Dispose()
+          "done" | Set-Content -Encoding UTF8 $done
+        }}
+        """
+    ).strip()
+
+    with tempfile.NamedTemporaryFile("w", suffix=".ps1", delete=False, encoding="utf-8") as f:
+        f.write(script)
+        local_script = f.name
+    try:
+        run(["scp", local_script, f"{host}:{remote_script}"], check=True)
+    finally:
+        os.unlink(local_script)
+    return remote_script, remote_png, remote_info, remote_done
+
+
+def scp_path(windows_path):
+    if windows_path.startswith(r"C:\Users\Administrator"):
+        suffix = windows_path[len(r"C:\Users\Administrator") :].replace("\\", "/")
+        return f"/Users/Administrator{suffix}"
+    return windows_path.replace("\\", "/")
+
+
+def schedule_and_run(host, remote_script):
+    ps(host, f'schtasks /Delete /TN {TASK_NAME} /F 2>$null', check=False)
+    create = textwrap.dedent(
+        rf"""
+        $trigger = 'powershell.exe -NoProfile -ExecutionPolicy Bypass -File "{remote_script}"'
+        & schtasks /Create /TN {TASK_NAME} /TR $trigger /SC ONCE /ST 23:59 /RL HIGHEST /IT /F
+        exit $LASTEXITCODE
+        """
     )
-    return result.stdout + result.stderr
+    ps(host, create, check=True)
+    ps(host, f'schtasks /Run /TN {TASK_NAME}', check=True)
 
 
-def ps(host, cmd):
-    """Run PowerShell command via SSH."""
-    return run_ssh(host, f'powershell -NoProfile -Command "{cmd}"')
-
-
-def wait_for_window(host, process_name, timeout=10):
-    """Wait for window handle to become non-zero."""
+def wait_for_done(host, remote_done, timeout=30):
     for _ in range(timeout):
-        result = ps(host, f'$p = Get-Process -Name {process_name} -ErrorAction SilentlyContinue; if ($p) {{ Write-Output $p.MainWindowHandle }} else {{ Write-Output 0 }}')
-        try:
-            hwnd = int(result.strip())
-            if hwnd > 0:
-                return hwnd
-        except ValueError:
-            pass
+        result = ps(host, f'Test-Path "{remote_done}"')
+        if "True" in result.stdout:
+            return True
         time.sleep(1)
-    return 0
-
-
-def capture_with_graphics(host):
-    """Capture using System.Drawing."""
-    script = 'Add-Type -AssemblyName System.Windows.Forms, System.Drawing; $bmp = New-Object System.Drawing.Bitmap(960,540); $g = [System.Drawing.Graphics]::FromImage($bmp); $g.Clear([System.Drawing.Color]::FromArgb(240,240,240)); $font = New-Object System.Drawing.Font("Segoe UI",18); $brush = [System.Drawing.Brushes]::Black; $g.DrawString("AgentNotify UI",$font,$brush,340,250); $font2 = New-Object System.Drawing.Font("Segoe UI",12); $g.DrawString("Clash Verge Theme - Light Mode",$font2,[System.Drawing.Brushes]::Gray,340,290); $bmp.Save("C:\\Users\\Administrator\\screenshot.png",[System.Drawing.Imaging.ImageFormat]::Png); $g.Dispose(); $bmp.Dispose(); $font.Dispose(); $font2.Dispose(); Write-Output done'
-    result = ps(host, script)
-    return "done" in result
+    return False
 
 
 def main():
     parser = argparse.ArgumentParser(description="Capture Windows UI screenshot")
     parser.add_argument("--host", required=True, help="SSH destination")
     parser.add_argument("--exe", required=True, help="Path to .exe on Windows")
-    parser.add_argument("--process", required=True, help="Process name")
+    parser.add_argument("--process", required=True, help="Process name without .exe")
     parser.add_argument("--out", required=True, help="Local output path")
     args = parser.parse_args()
 
-    host = args.host
-    exe_path = args.exe
-    process_name = args.process
-    out_path = args.out
+    remote_script, remote_png, remote_info, remote_done = write_capture_script(
+        args.host, args.exe, args.process
+    )
+    schedule_and_run(args.host, remote_script)
+    if not wait_for_done(args.host, remote_done):
+        raise SystemExit("ERROR: timed out waiting for interactive screenshot task")
 
-    # Kill existing
-    ps(host, f'taskkill /F /IM {process_name}.exe 2>nul')
+    os.makedirs(os.path.dirname(args.out) or ".", exist_ok=True)
+    run(["scp", f"{args.host}:{scp_path(remote_png)}", args.out], check=True)
+    info = ps(args.host, f'Get-Content "{remote_info}" -Raw')
+    print(f"screenshot={args.out}")
+    print(info.stdout.strip())
 
-    # Start process
-    print(f"Starting {process_name}...")
-    ps(host, f'start /B "" "{exe_path}"')
-
-    # Wait for window
-    print(f"Waiting for {process_name} window...")
-    hwnd = wait_for_window(host, process_name, timeout=10)
-    print(f"Window handle: {hwnd}")
-
-    # Try screenshot
-    print("Attempting screenshot...")
-    if capture_with_graphics(host):
-        local_dir = os.path.dirname(out_path)
-        if local_dir:
-            os.makedirs(local_dir, exist_ok=True)
-        result = subprocess.run(
-            ["scp", f"{host}:/Users/Administrator/screenshot.png", out_path],
-            capture_output=True
-        )
-        if os.path.exists(out_path):
-            print(f"screenshot={out_path}")
-            ps(host, r'del "C:\Users\Administrator\screenshot.png" 2>nul')
-            return
-
-    # Fallback: verify build
-    print("Screenshot capture failed (VM display issue). Verifying build instead...")
-    result = ps(host, f'Test-Path "{exe_path}"')
-
-    if result.strip() == "True":
-        size_result = ps(host, f'(Get-Item "{exe_path}").Length')
-        print(f"Build verified: exe exists ({size_result.strip()} bytes)")
-        print(f"hwnd={hwnd} (Tauri may use offscreen rendering)")
-        with open(out_path.replace('.png', '_note.txt'), 'w') as f:
-            f.write(f"Build verified at {exe_path}\n")
-            f.write(f"Window handle: {hwnd}\n")
-            f.write(f"Size: {size_result.strip()}\n")
-            f.write("Note: VM lacks display - screenshot API unavailable\n")
-        print(f"verification={out_path.replace('.png', '_note.txt')}")
-    else:
-        print("ERROR: exe not found")
-        sys.exit(1)
-
-    ps(host, r'del "C:\Users\Administrator\screenshot.png" 2>nul')
+    ps(
+        args.host,
+        f'Remove-Item "{remote_script}","{remote_png}","{remote_info}","{remote_done}" -Force -ErrorAction SilentlyContinue; schtasks /Delete /TN {TASK_NAME} /F 2>$null',
+        check=False,
+    )
 
 
 if __name__ == "__main__":

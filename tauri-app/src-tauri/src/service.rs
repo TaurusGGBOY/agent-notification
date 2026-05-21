@@ -3,7 +3,7 @@ use std::net::TcpStream;
 use std::sync::Mutex;
 use std::time::Duration;
 
-use tauri::{AppHandle, Manager, State};
+use tauri::{AppHandle, Emitter, Manager, State};
 use tauri_plugin_shell::process::{CommandChild, CommandEvent};
 use tauri_plugin_shell::ShellExt;
 
@@ -77,10 +77,9 @@ pub fn ensure_sidecar(app: &AppHandle) -> Result<(), String> {
 
 pub fn stop_sidecar(state: &State<ServiceState>) {
     if let Ok(mut guard) = state.child.lock() {
-        if let Some(child) = guard.as_mut() {
+        if let Some(child) = guard.take() {
             let _ = child.kill();
         }
-        *guard = None;
     }
 }
 

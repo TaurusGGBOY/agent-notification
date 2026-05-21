@@ -1,16 +1,46 @@
+#![cfg_attr(not(debug_assertions), windows_subsystem = "windows")]
+
 mod service;
 mod tray;
 
-use tauri::Manager;
+use tauri::{Manager, Theme};
+
+#[tauri::command]
+fn set_app_theme(app: tauri::AppHandle, theme: String) -> Result<(), String> {
+    let theme = match theme.as_str() {
+        "light" => Theme::Light,
+        "dark" => Theme::Dark,
+        value => return Err(format!("unsupported theme: {value}")),
+    };
+
+    app.set_theme(Some(theme));
+    for window in app.webview_windows().values() {
+        window
+            .set_theme(Some(theme))
+            .map_err(|err| err.to_string())?;
+    }
+    Ok(())
+}
 
 fn main() {
     tauri::Builder::default()
         .plugin(tauri_plugin_shell::init())
         .manage(service::ServiceState::new())
-        .invoke_handler(tauri::generate_handler![service::service_status, service::restart_service])
+        .invoke_handler(tauri::generate_handler![
+            service::service_status,
+            service::restart_service,
+            set_app_theme
+        ])
         .setup(|app| {
             service::ensure_sidecar(app.handle())?;
             tray::build_tray(app.handle())?;
+            if let Some(window) = app.get_webview_window("main") {
+                let _ = window.set_size(tauri::Size::Logical(tauri::LogicalSize {
+                    width: 1200.0,
+                    height: 675.0,
+                }));
+                let _ = window.center();
+            }
             Ok(())
         })
         .on_window_event(|window, event| {

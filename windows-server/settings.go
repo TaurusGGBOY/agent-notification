@@ -355,6 +355,7 @@ var validStyles = map[string]bool{
 	"status-color": true,
 	"agent-badge":  true,
 	"compact":      true,
+	"custom-card":  true,
 }
 
 var validEvents = map[string]bool{

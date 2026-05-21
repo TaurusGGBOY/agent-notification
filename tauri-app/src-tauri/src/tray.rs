@@ -1,16 +1,19 @@
+use std::io::{Read, Write};
+use std::net::TcpStream;
+
 use tauri::menu::{Menu, MenuItem, PredefinedMenuItem};
 use tauri::tray::{MouseButton, MouseButtonState, TrayIconBuilder, TrayIconEvent};
-use tauri::{AppHandle, Manager};
+use tauri::{AppHandle, Emitter, Manager};
 
 use crate::service;
 
 pub fn build_tray(app: &AppHandle) -> tauri::Result<()> {
-    let open = MenuItem::with_id(app, "open", "Open AgentNotify", true, None::<&str>)?;
-    let test = MenuItem::with_id(app, "test", "Send Test Notification", true, None::<&str>)?;
-    let pause = MenuItem::with_id(app, "pause", "Pause Notifications", true, None::<&str>)?;
-    let resume = MenuItem::with_id(app, "resume", "Resume Notifications", true, None::<&str>)?;
-    let restart = MenuItem::with_id(app, "restart", "Restart Service", true, None::<&str>)?;
-    let quit = MenuItem::with_id(app, "quit", "Quit", true, None::<&str>)?;
+    let open = MenuItem::with_id(app, "open", "打开 AgentNotify", true, None::<&str>)?;
+    let test = MenuItem::with_id(app, "test", "发送测试通知", true, None::<&str>)?;
+    let pause = MenuItem::with_id(app, "pause", "暂停通知", true, None::<&str>)?;
+    let resume = MenuItem::with_id(app, "resume", "恢复通知", true, None::<&str>)?;
+    let restart = MenuItem::with_id(app, "restart", "重启服务", true, None::<&str>)?;
+    let quit = MenuItem::with_id(app, "quit", "退出", true, None::<&str>)?;
     let separator = PredefinedMenuItem::separator(app)?;
 
     let menu = Menu::with_items(
@@ -79,19 +82,54 @@ fn show_main_window(app: &AppHandle) {
 async fn send_test_notification() -> Result<(), String> {
     post_json(
         "/notify",
-        r#"{"agent":"tauri","event":"start","project":"AgentNotify","message":"Test notification from tray","sourcePayload":{}}"#,
+        r#"{"agent":"tauri","event":"start","project":"AgentNotify","message":"来自托盘的测试通知","sourcePayload":{}}"#,
     )
     .await
 }
 
+async fn get_config() -> Result<serde_json::Value, String> {
+    let addr = "127.0.0.1:17891";
+    let request = "GET /config HTTP/1.1\r\nHost: 127.0.0.1\r\nConnection: close\r\n\r\n";
+    let addr = addr.to_string();
+    let request = request.to_string();
+    tauri::async_runtime::spawn_blocking(move || {
+        let mut stream = TcpStream::connect(addr).map_err(|err| err.to_string())?;
+        stream
+            .write_all(request.as_bytes())
+            .map_err(|err| err.to_string())?;
+        let mut response = String::new();
+        stream
+            .read_to_string(&mut response)
+            .map_err(|err| err.to_string())?;
+        let body = response
+            .split("\r\n\r\n")
+            .nth(1)
+            .unwrap_or("{}");
+        serde_json::from_str(body).map_err(|err| err.to_string())
+    })
+    .await
+    .map_err(|err| err.to_string())?
+}
+
 async fn set_events_enabled(enabled: bool) -> Result<(), String> {
+    let config = get_config().await?;
+    let notification_style = config
+        .get("notificationStyle")
+        .and_then(|v| v.as_str())
+        .unwrap_or("clean");
+    let future_overrides = config
+        .get("futureOverrides")
+        .and_then(|v| serde_json::to_string(v).ok())
+        .unwrap_or_else(|| "{}".to_string());
+
     let events = if enabled {
         r#"["start","stop"]"#
     } else {
         "[]"
     };
     let body = format!(
-        r#"{{"notificationStyle":"custom-card","enabledEvents":{events},"futureOverrides":{{}}}}"#
+        r#"{{"notificationStyle":"{}","enabledEvents":{},"futureOverrides":{}}}"#,
+        notification_style, events, future_overrides
     );
     post_json("/settings", &body).await
 }
@@ -107,9 +145,6 @@ async fn post_json(path: &str, body: &str) -> Result<(), String> {
 }
 
 async fn tokio_like_tcp(addr: &str, request: &str) -> Result<(), String> {
-    use std::io::{Read, Write};
-    use std::net::TcpStream;
-
     let addr = addr.to_string();
     let request = request.to_string();
     tauri::async_runtime::spawn_blocking(move || {

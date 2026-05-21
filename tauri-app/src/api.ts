@@ -54,7 +54,7 @@ export async function sendTestNotification(event: EventName = "start"): Promise<
       agent: "tauri",
       event,
       project: "AgentNotify",
-      message: "Test notification from AgentNotify",
+      message: "来自 AgentNotify 的测试通知",
       timestamp: new Date().toISOString(),
       sourcePayload: {},
     }),

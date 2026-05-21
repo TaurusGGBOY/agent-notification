@@ -5,6 +5,7 @@ import { render } from "./ui";
 
 async function boot() {
   applyTheme(getInitialTheme());
+  render();
   await refreshState();
   render();
 }

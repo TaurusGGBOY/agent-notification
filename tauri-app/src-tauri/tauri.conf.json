@@ -14,11 +14,12 @@
       {
         "label": "main",
         "title": "AgentNotify",
-        "width": 460,
-        "height": 560,
+        "width": 1200,
+        "height": 675,
         "resizable": false,
         "fullscreen": false,
-        "visible": false
+        "theme": "Light",
+        "visible": true
       }
     ]
   },

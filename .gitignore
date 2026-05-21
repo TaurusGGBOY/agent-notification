@@ -3,3 +3,6 @@
 windows-server/*.exe
 windows-server/*.log
 tauri-app/src-tauri/binaries/agent-notify-server-*
+tauri-app/src-tauri/target/
+tauri-app/dist/
+tauri-app/node_modules/

@@ -32,12 +32,20 @@ export function render(): void {
           </div>
         </div>
 
-        <nav class="side-nav" aria-label="主导航">
-          ${navItem("⌂", "首页", true)}
-          ${navItem("◈", "通知")}
-          ${navItem("▣", "预览")}
-          ${navItem("⚙", "设置")}
-        </nav>
+        <section class="side-summary">
+          <div>
+            <span>服务</span>
+            <strong>${state.serviceHealthy ? "在线" : "离线"}</strong>
+          </div>
+          <div>
+            <span>样式</span>
+            <strong>${labelForStyle(currentStyle)}</strong>
+          </div>
+          <div>
+            <span>模式</span>
+            <strong>${isPaused ? "暂停" : "活跃"}</strong>
+          </div>
+        </section>
 
         <div class="traffic-card">
           <div class="sparkline" aria-hidden="true"><span></span><span></span></div>
@@ -51,8 +59,8 @@ export function render(): void {
       <main class="main-surface">
         <header class="topbar">
           <div>
-            <h1>首页</h1>
-            <p>管理本机 Agent 通知服务、样式和事件开关</p>
+            <h1>通知控制台</h1>
+            <p>本机 Agent 通知服务、样式、预览和事件开关</p>
           </div>
           <div class="top-actions">
             <form class="command-box" data-command-form>
@@ -82,10 +90,6 @@ export function render(): void {
               <div><span>服务地址</span><strong>${escapeHtml(serviceUrl)}</strong></div>
               <div><span>客户端版本</span><strong>${escapeHtml(version)}</strong></div>
               <div><span>事件模式</span><strong>${isPaused ? "已暂停" : "启动 / 停止"}</strong></div>
-            </div>
-            <div class="progress-row">
-              <span>${isPaused ? "0" : "100"}%</span>
-              <div class="progress-track"><i style="width: ${isPaused ? "0" : "100"}%"></i></div>
             </div>
           </section>
 
@@ -242,15 +246,6 @@ function bindEvents(): void {
     applyTheme(currentTheme);
     render();
   });
-}
-
-function navItem(icon: string, label: string, active = false): string {
-  return `
-    <button class="nav-item ${active ? "active" : ""}" type="button">
-      <span>${icon}</span>
-      <strong>${label}</strong>
-    </button>
-  `;
 }
 
 function eventToggle(event: EventName, enabled: boolean): string {
