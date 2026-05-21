@@ -1,7 +1,6 @@
 package main
 
 import (
-	"context"
 	"log"
 	"net/http"
 	"os"
@@ -44,11 +43,17 @@ func main() {
 		cfg.NotificationStyle, cfg.EnabledEvents)
 
 	server := NewServer(cfg)
+	broadcast := NewBroadcastController(17891)
+	if err := broadcast.SetEnabled(true); err != nil {
+		log.Printf("Warning: mDNS advertisement failed: %v", err)
+	}
 
 	mux := http.NewServeMux()
 	mux.HandleFunc("/health", server.HealthHandler)
 	mux.HandleFunc("/manifest", server.ManifestHandler)
 	mux.HandleFunc("/notify", server.NotifyHandler)
+	mux.HandleFunc("/history", server.HistoryHandler)
+	mux.Handle("/broadcast", NewBroadcastHandler(broadcast))
 	mux.Handle("/settings", NewSettingsHandler())
 	mux.Handle("/config", &ConfigHandler{})
 
@@ -58,13 +63,6 @@ func main() {
 			log.Fatalf("HTTP server failed: %v", err)
 		}
 	}()
-
-	ctx, cancel := context.WithCancel(context.Background())
-	defer cancel()
-
-	if err := StartMDNSAdvertisement(ctx, 17891); err != nil {
-		log.Printf("Warning: mDNS advertisement failed: %v", err)
-	}
 
 	log.Println("Server started successfully")
 	select {}

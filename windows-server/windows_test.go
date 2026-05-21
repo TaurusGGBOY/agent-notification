@@ -357,7 +357,7 @@ func TestFormatMessage(t *testing.T) {
 func TestFormatMessage_MultipleFields(t *testing.T) {
 	payload := NotifyPayload{
 		Project: "test-project",
-		Cwd:    "/home/user",
+		Cwd:     "/home/user",
 		Message: "test message",
 	}
 
@@ -668,8 +668,8 @@ func TestManifestHandler_ExtendedFields(t *testing.T) {
 	var resp ManifestResponse
 	json.NewDecoder(w.Body).Decode(&resp)
 
-	if resp.URL != "http://localhost:17891" {
-		t.Errorf("expected url 'http://localhost:17891', got %q", resp.URL)
+	if !strings.HasPrefix(resp.URL, "http://") || !strings.HasSuffix(resp.URL, ":17891") {
+		t.Errorf("expected LAN-style url on port 17891, got %q", resp.URL)
 	}
 
 	if resp.Hostname == "" {
@@ -701,6 +701,58 @@ func TestManifestHandler_ExtendedFields(t *testing.T) {
 	}
 	if !foundStart || !foundStop {
 		t.Error("supportedEvents should contain start and stop")
+	}
+}
+
+func TestNotifyHandler_RecordsRecentHistory(t *testing.T) {
+	cfg := DefaultConfig()
+	server := NewServer(cfg)
+
+	for i := 0; i < 4; i++ {
+		body := `{"agent":"claude","event":"start","project":"project-` + string(rune('A'+i)) + `","message":"message"}`
+		req := httptest.NewRequest(http.MethodPost, "/notify", bytes.NewBufferString(body))
+		w := httptest.NewRecorder()
+		server.NotifyHandler(w, req)
+		if w.Code != http.StatusNoContent {
+			t.Fatalf("notify %d status = %d", i, w.Code)
+		}
+	}
+
+	req := httptest.NewRequest(http.MethodGet, "/history", nil)
+	w := httptest.NewRecorder()
+	server.HistoryHandler(w, req)
+
+	var resp HistoryResponse
+	if err := json.NewDecoder(w.Body).Decode(&resp); err != nil {
+		t.Fatalf("decode history failed: %v", err)
+	}
+	if len(resp.Items) != 3 {
+		t.Fatalf("history length = %d, want 3", len(resp.Items))
+	}
+	if resp.Items[0].Project != "project-D" {
+		t.Fatalf("latest project = %q, want project-D", resp.Items[0].Project)
+	}
+	if resp.Items[2].Project != "project-B" {
+		t.Fatalf("oldest kept project = %q, want project-B", resp.Items[2].Project)
+	}
+}
+
+func TestBroadcastHandler_GetAndInvalidPost(t *testing.T) {
+	controller := NewBroadcastController(17891)
+	handler := NewBroadcastHandler(controller)
+
+	req := httptest.NewRequest(http.MethodGet, "/broadcast", nil)
+	w := httptest.NewRecorder()
+	handler.ServeHTTP(w, req)
+	if w.Code != http.StatusOK {
+		t.Fatalf("GET status = %d, want %d", w.Code, http.StatusOK)
+	}
+
+	req = httptest.NewRequest(http.MethodPost, "/broadcast", bytes.NewBufferString(`{}`))
+	w = httptest.NewRecorder()
+	handler.ServeHTTP(w, req)
+	if w.Code != http.StatusBadRequest {
+		t.Fatalf("POST missing enabled status = %d, want %d", w.Code, http.StatusBadRequest)
 	}
 }
 

@@ -1,9 +1,11 @@
-import { getConfig, getManifest } from "./api";
+import { getBroadcastStatus, getConfig, getManifest, getNotificationHistory } from "./api";
 import { state } from "./state";
 
 export async function refreshState(): Promise<void> {
   state.loading = true;
   state.error = "";
+  state.historyError = "";
+  state.broadcastError = "";
   try {
     const [config, manifest] = await Promise.all([getConfig(), getManifest()]);
     state.config = config;
@@ -14,5 +16,18 @@ export async function refreshState(): Promise<void> {
     state.serviceHealthy = false;
   } finally {
     state.loading = false;
+  }
+
+  try {
+    state.history = (await getNotificationHistory()).items ?? [];
+  } catch (err) {
+    state.historyError = err instanceof Error ? err.message : String(err);
+  }
+
+  try {
+    state.broadcast = await getBroadcastStatus();
+  } catch (err) {
+    state.broadcast = null;
+    state.broadcastError = err instanceof Error ? err.message : String(err);
   }
 }

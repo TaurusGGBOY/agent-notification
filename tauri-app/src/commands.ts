@@ -17,8 +17,6 @@ const styleAliases: Record<string, NotificationStyle> = {
   status: "status-color",
   badge: "agent-badge",
   compact: "compact",
-  card: "custom-card",
-  custom: "custom-card",
 };
 
 export async function runCommand(input: string, config: AgentConfig | null): Promise<CommandResult> {
@@ -79,7 +77,6 @@ function labelForStyle(style: NotificationStyle): string {
     "status-color": "状态",
     "agent-badge": "徽章",
     compact: "紧凑",
-    "custom-card": "卡片",
   };
   return labels[style];
 }

@@ -1,6 +1,6 @@
 const BASE_URL = "http://127.0.0.1:17891";
 
-export type NotificationStyle = "clean" | "status-color" | "agent-badge" | "compact" | "custom-card";
+export type NotificationStyle = "clean" | "status-color" | "agent-badge" | "compact";
 export type EventName = "start" | "stop";
 
 export interface AgentConfig {
@@ -21,12 +21,48 @@ export interface Manifest {
   supportedStyles: NotificationStyle[];
 }
 
+export interface BroadcastStatus {
+  enabled: boolean;
+}
+
+export interface NotificationHistoryItem {
+  time: string;
+  agent: string;
+  event: EventName;
+  project: string;
+  message: string;
+}
+
+export interface NotificationHistory {
+  items: NotificationHistoryItem[];
+}
+
 export async function getConfig(): Promise<AgentConfig> {
   return getJson<AgentConfig>("/config");
 }
 
 export async function getManifest(): Promise<Manifest> {
   return getJson<Manifest>("/manifest");
+}
+
+export async function getBroadcastStatus(): Promise<BroadcastStatus> {
+  return getJson<BroadcastStatus>("/broadcast");
+}
+
+export async function setBroadcastEnabled(enabled: boolean): Promise<BroadcastStatus> {
+  const res = await fetch(`${BASE_URL}/broadcast`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ enabled }),
+  });
+  if (!res.ok) {
+    throw new Error(`set broadcast failed: ${res.status}`);
+  }
+  return (await res.json()) as BroadcastStatus;
+}
+
+export async function getNotificationHistory(): Promise<NotificationHistory> {
+  return getJson<NotificationHistory>("/history");
 }
 
 export async function saveConfig(config: AgentConfig): Promise<void> {
