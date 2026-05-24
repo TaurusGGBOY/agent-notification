@@ -155,6 +155,44 @@ button {
   white-space: nowrap;
 }
 
+.side-summary .broadcast-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  min-height: 58px;
+  padding: 0 14px;
+  border: 1px solid var(--border);
+  border-radius: 9px;
+  background: var(--card);
+}
+
+.side-summary .broadcast-row span {
+  color: var(--muted);
+  font-size: 14px;
+}
+
+.side-summary .button-row {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 8px;
+}
+
+.side-summary .button-row button {
+  min-height: 40px;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  background: color-mix(in srgb, var(--border) 45%, transparent);
+  color: var(--text);
+  font-weight: 700;
+  font-size: 13px;
+}
+
+.side-summary .button-row button.primary {
+  border-color: var(--primary);
+  background: var(--primary);
+  color: #fff;
+}
+
 .traffic-card {
   margin-top: auto;
   padding: 12px 10px;

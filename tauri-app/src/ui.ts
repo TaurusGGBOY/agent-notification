@@ -39,6 +39,16 @@ export function render(): void {
             <span>地址</span>
             <strong class="side-address">${escapeHtml(serviceUrl)}</strong>
           </div>
+          <div class="broadcast-row">
+            <span>广播</span>
+            <button class="switch ${broadcastEnabled ? "on" : ""}" data-action="broadcast" ${state.broadcastError ? "disabled" : ""}>
+              <i></i>
+            </button>
+          </div>
+          <div class="button-row">
+            <button class="primary" data-action="test">测试</button>
+            <button data-action="refresh">刷新</button>
+          </div>
         </section>
 
         <div class="traffic-card">
@@ -99,25 +109,6 @@ export function render(): void {
             ${previewMarkup(currentStyle)}
           </section>
 
-          <section class="card broadcast-card">
-            <div class="card-head">
-              <div class="card-icon green">◉</div>
-              <div>
-                <h2>局域网广播</h2>
-                <p>控制 mDNS 发现，HTTP 服务不会停止</p>
-              </div>
-            </div>
-            <div class="broadcast-row">
-              <div>
-                <strong>${broadcastEnabled ? "广播开启" : "广播关闭"}</strong>
-                <span>${state.broadcastError ? "广播状态未知" : "局域网设备可发现服务"}</span>
-              </div>
-              <button class="switch ${broadcastEnabled ? "on" : ""}" data-action="broadcast" ${state.broadcastError ? "disabled" : ""}>
-                <i></i>
-              </button>
-            </div>
-          </section>
-
           <section class="card history-card">
             <div class="card-head">
               <div class="card-icon blue">◷</div>
@@ -128,20 +119,6 @@ export function render(): void {
             </div>
             <div class="history-list">
               ${historyMarkup()}
-            </div>
-          </section>
-
-          <section class="card actions-card">
-            <div class="card-head">
-              <div class="card-icon green">✓</div>
-              <div>
-                <h2>快捷操作</h2>
-                <p>发送测试通知或刷新服务状态</p>
-              </div>
-            </div>
-            <div class="button-row">
-              <button class="primary" data-action="test">测试</button>
-              <button data-action="refresh">刷新</button>
             </div>
           </section>
         </section>
