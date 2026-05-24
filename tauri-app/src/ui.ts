@@ -68,9 +68,6 @@ export function render(): void {
           </div>
           <div class="top-actions">
             <button class="icon-button" data-action="theme" title="切换明暗模式">${currentTheme === "light" ? "☾" : "☀"}</button>
-            <span class="service-pill ${state.serviceHealthy ? "is-running" : "is-offline"}">
-              ${state.serviceHealthy ? "运行中" : "离线"}
-            </span>
           </div>
         </header>
 

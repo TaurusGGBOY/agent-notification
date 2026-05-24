@@ -149,10 +149,11 @@ button {
 }
 
 .side-address {
-  max-width: 128px;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
+  max-width: none;
+  overflow: visible;
+  text-overflow: clip;
+  white-space: normal;
+  word-break: break-all;
 }
 
 .side-summary .broadcast-row {
@@ -238,6 +239,8 @@ button {
   min-width: 0;
   overflow: hidden;
   padding: 24px;
+  display: flex;
+  flex-direction: column;
 }
 
 .topbar {
@@ -326,21 +329,21 @@ button {
 
 .dashboard-grid {
   display: grid;
-  grid-template-columns: minmax(0, 1fr) minmax(0, 1.08fr);
-  grid-template-rows: repeat(3, minmax(0, 1fr));
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+  grid-template-rows: minmax(0, auto) minmax(0, 1fr);
   gap: 12px;
-  height: calc(100vh - 108px);
   min-height: 0;
+  flex: 1;
 }
 
 .history-card {
-  grid-row: span 2;
+  grid-row: 2;
+  grid-column: span 2;
 }
 
 .card {
   min-width: 0;
   min-height: 0;
-  overflow: hidden;
   border: 1px solid var(--border);
   border-radius: var(--radius);
   background: var(--card);
