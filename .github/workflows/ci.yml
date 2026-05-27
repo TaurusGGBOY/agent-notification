@@ -1,0 +1,67 @@
+name: CI
+
+on:
+  push:
+    branches:
+      - main
+  pull_request:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  test:
+    name: Unit Tests
+    runs-on: windows-latest
+    defaults:
+      run:
+        shell: pwsh
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Go
+        uses: actions/setup-go@v5
+        with:
+          go-version-file: windows-server/go.mod
+          cache-dependency-path: windows-server/go.sum
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: tauri-app/package-lock.json
+
+      - name: Show tool versions
+        run: |
+          go version
+          node --version
+          npm --version
+          rustc --version
+          cargo --version
+
+      - name: Run Go unit tests
+        working-directory: windows-server
+        run: go test ./... -v
+
+      - name: Install frontend dependencies
+        working-directory: tauri-app
+        run: npm ci
+
+      - name: Build frontend
+        working-directory: tauri-app
+        run: npm run build
+
+      - name: Prepare Tauri sidecar
+        working-directory: tauri-app
+        run: npm run prepare:sidecar
+
+      - name: Run Tauri Rust unit tests
+        working-directory: tauri-app/src-tauri
+        run: cargo test --all -- --nocapture
