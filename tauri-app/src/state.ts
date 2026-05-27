@@ -1,4 +1,4 @@
-import type { AgentConfig, BroadcastStatus, Manifest, NotificationHistoryItem } from "./api";
+import type { AgentConfig, BroadcastStatus, Manifest, NotificationHistoryItem, WindowsNotificationStatus } from "./api";
 
 export interface AppState {
   loading: boolean;
@@ -6,9 +6,11 @@ export interface AppState {
   config: AgentConfig | null;
   manifest: Manifest | null;
   broadcast: BroadcastStatus | null;
+  windowsNotifications: WindowsNotificationStatus | null;
   history: NotificationHistoryItem[];
   historyError: string;
   broadcastError: string;
+  windowsNotificationError: string;
   serviceHealthy: boolean;
 }
 
@@ -18,8 +20,10 @@ export const state: AppState = {
   config: null,
   manifest: null,
   broadcast: null,
+  windowsNotifications: null,
   history: [],
   historyError: "",
   broadcastError: "",
+  windowsNotificationError: "",
   serviceHealthy: false,
 };

@@ -1,6 +1,7 @@
 #![cfg_attr(not(debug_assertions), windows_subsystem = "windows")]
 
 mod service;
+mod notification_settings;
 mod tray;
 
 use tauri::{Manager, Theme};
@@ -27,6 +28,8 @@ fn main() {
         .plugin(tauri_plugin_shell::init())
         .manage(service::ServiceState::new())
         .invoke_handler(tauri::generate_handler![
+            notification_settings::open_windows_notification_settings,
+            notification_settings::windows_notification_status,
             service::service_status,
             service::restart_service,
             set_app_theme

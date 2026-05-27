@@ -25,6 +25,10 @@ export interface BroadcastStatus {
   enabled: boolean;
 }
 
+export interface WindowsNotificationStatus {
+  enabled: boolean;
+}
+
 export interface NotificationHistoryItem {
   time: string;
   agent: string;
@@ -80,6 +84,14 @@ import { invoke } from "@tauri-apps/api/core";
 
 export async function restartService(): Promise<void> {
   await invoke("restart_service");
+}
+
+export async function getWindowsNotificationStatus(): Promise<WindowsNotificationStatus> {
+  return await invoke<WindowsNotificationStatus>("windows_notification_status");
+}
+
+export async function openWindowsNotificationSettings(): Promise<void> {
+  await invoke("open_windows_notification_settings");
 }
 
 export async function sendTestNotification(event: EventName = "start"): Promise<void> {

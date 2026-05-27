@@ -69,7 +69,7 @@ button {
 
 .app-shell {
   display: grid;
-  grid-template-columns: 236px minmax(0, 1fr);
+  grid-template-columns: 280px minmax(0, 1fr);
   width: 100vw;
   height: 100vh;
   background: var(--surface);
@@ -90,6 +90,11 @@ button {
   align-items: center;
   gap: 12px;
   padding: 0 10px 22px;
+}
+
+.drag-region {
+  cursor: move;
+  user-select: none;
 }
 
 .brand-icon,
@@ -148,15 +153,29 @@ button {
   font-size: 16px;
 }
 
+.side-summary .address-row {
+  flex-direction: column;
+  align-items: flex-start;
+  justify-content: center;
+  gap: 7px;
+  min-height: 78px;
+  padding-top: 10px;
+  padding-bottom: 10px;
+}
+
 .side-address {
+  display: block;
   max-width: none;
   overflow: visible;
   text-overflow: clip;
   white-space: normal;
-  word-break: break-all;
+  overflow-wrap: anywhere;
+  word-break: normal;
+  line-height: 1.3;
 }
 
-.side-summary .broadcast-row {
+.side-summary .broadcast-row,
+.side-summary .notification-row {
   display: flex;
   align-items: center;
   justify-content: space-between;
@@ -167,7 +186,8 @@ button {
   background: var(--card);
 }
 
-.side-summary .broadcast-row span {
+.side-summary .broadcast-row span,
+.side-summary .notification-row span {
   color: var(--muted);
   font-size: 14px;
 }
@@ -250,6 +270,11 @@ button {
   gap: 16px;
   height: 70px;
   margin-bottom: 14px;
+}
+
+.topbar-title {
+  flex: 1;
+  min-width: 0;
 }
 
 .topbar h1 {

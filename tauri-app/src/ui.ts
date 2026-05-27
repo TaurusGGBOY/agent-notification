@@ -1,7 +1,14 @@
-import { saveConfig, sendTestNotification, setBroadcastEnabled, type NotificationStyle } from "./api";
+import {
+  openWindowsNotificationSettings,
+  saveConfig,
+  sendTestNotification,
+  setBroadcastEnabled,
+  type NotificationStyle,
+} from "./api";
 import { refreshState } from "./service";
 import { state } from "./state";
 import { applyTheme, getInitialTheme, toggleTheme, type AppTheme } from "./theme";
+import { getCurrentWindow } from "@tauri-apps/api/window";
 
 const notificationStyles: NotificationStyle[] = ["clean", "status-color", "agent-badge", "compact"];
 let currentTheme: AppTheme = getInitialTheme();
@@ -18,11 +25,12 @@ export function render(): void {
   const serviceUrl = state.manifest?.url ?? "等待服务地址";
   const version = state.manifest?.version ?? "未知";
   const broadcastEnabled = state.broadcast?.enabled ?? false;
+  const windowsNotificationsEnabled = state.windowsNotifications?.enabled === true;
 
   app.innerHTML = `
     <section class="app-shell">
       <aside class="sidebar">
-        <div class="brand">
+        <div class="brand drag-region" data-drag-region>
           <div class="brand-icon">A</div>
           <div>
             <strong>AgentNotify</strong>
@@ -35,13 +43,24 @@ export function render(): void {
             <span>服务</span>
             <strong>${state.serviceHealthy ? "在线" : "离线"}</strong>
           </div>
-          <div>
+          <div class="address-row">
             <span>地址</span>
             <strong class="side-address">${escapeHtml(serviceUrl)}</strong>
           </div>
           <div class="broadcast-row">
             <span>广播</span>
             <button class="switch ${broadcastEnabled ? "on" : ""}" data-action="broadcast" ${state.broadcastError ? "disabled" : ""}>
+              <i></i>
+            </button>
+          </div>
+          <div class="notification-row">
+            <span>Windows 通知</span>
+            <button
+              class="switch ${windowsNotificationsEnabled ? "on" : ""}"
+              data-action="windows-notifications"
+              title="打开 Windows 通知设置"
+              aria-pressed="${windowsNotificationsEnabled}"
+            >
               <i></i>
             </button>
           </div>
@@ -62,7 +81,7 @@ export function render(): void {
 
       <main class="main-surface">
         <header class="topbar">
-          <div>
+          <div class="topbar-title drag-region" data-drag-region>
             <h1>通知控制台</h1>
             <p>本机 Agent 通知服务、样式、广播和历史</p>
           </div>
@@ -161,6 +180,20 @@ function bindEvents(): void {
     state.broadcast = await setBroadcastEnabled(next);
     await refreshState();
     render();
+  });
+
+  document.querySelector<HTMLButtonElement>('[data-action="windows-notifications"]')?.addEventListener("click", async () => {
+    await openWindowsNotificationSettings();
+    window.setTimeout(() => {
+      void refreshState().then(render);
+    }, 1000);
+  });
+
+  document.querySelectorAll<HTMLElement>("[data-drag-region]").forEach((element) => {
+    element.addEventListener("mousedown", (event) => {
+      if (event.button !== 0) return;
+      void getCurrentWindow().startDragging();
+    });
   });
 }
 
