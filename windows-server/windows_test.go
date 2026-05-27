@@ -31,11 +31,17 @@ func (n *recordingNotifier) NotifyWithStyle(style, event, title, message, agent 
 	return nil
 }
 
+func newTestServer(cfg *Config) *Server {
+	server := NewServer(cfg)
+	server.notifier = &recordingNotifier{}
+	return server
+}
+
 // === Payload Validation Tests ===
 
 func TestNotifyHandler_ValidStartEvent(t *testing.T) {
 	cfg := DefaultConfig()
-	server := NewServer(cfg)
+	server := newTestServer(cfg)
 
 	body := `{"agent":"test","event":"start","project":"test-project"}`
 	req := httptest.NewRequest(http.MethodPost, "/notify", bytes.NewBufferString(body))
@@ -50,7 +56,7 @@ func TestNotifyHandler_ValidStartEvent(t *testing.T) {
 
 func TestNotifyHandler_ValidStopEvent(t *testing.T) {
 	cfg := DefaultConfig()
-	server := NewServer(cfg)
+	server := newTestServer(cfg)
 
 	body := `{"agent":"test","event":"stop"}`
 	req := httptest.NewRequest(http.MethodPost, "/notify", bytes.NewBufferString(body))
@@ -65,7 +71,7 @@ func TestNotifyHandler_ValidStopEvent(t *testing.T) {
 
 func TestNotifyHandler_CaseInsensitiveEvent(t *testing.T) {
 	cfg := DefaultConfig()
-	server := NewServer(cfg)
+	server := newTestServer(cfg)
 
 	testCases := []string{"START", "Stop", "Start", "STOP", "  start  "}
 	for _, event := range testCases {
@@ -83,7 +89,7 @@ func TestNotifyHandler_CaseInsensitiveEvent(t *testing.T) {
 
 func TestNotifyHandler_InvalidEvent(t *testing.T) {
 	cfg := DefaultConfig()
-	server := NewServer(cfg)
+	server := newTestServer(cfg)
 
 	body := `{"agent":"test","event":"invalid"}`
 	req := httptest.NewRequest(http.MethodPost, "/notify", bytes.NewBufferString(body))
@@ -104,7 +110,7 @@ func TestNotifyHandler_InvalidEvent(t *testing.T) {
 
 func TestNotifyHandler_EmptyEvent(t *testing.T) {
 	cfg := DefaultConfig()
-	server := NewServer(cfg)
+	server := newTestServer(cfg)
 
 	body := `{"agent":"test","event":""}`
 	req := httptest.NewRequest(http.MethodPost, "/notify", bytes.NewBufferString(body))
@@ -119,7 +125,7 @@ func TestNotifyHandler_EmptyEvent(t *testing.T) {
 
 func TestNotifyHandler_MissingEvent(t *testing.T) {
 	cfg := DefaultConfig()
-	server := NewServer(cfg)
+	server := newTestServer(cfg)
 
 	body := `{"agent":"test"}`
 	req := httptest.NewRequest(http.MethodPost, "/notify", bytes.NewBufferString(body))
@@ -134,7 +140,7 @@ func TestNotifyHandler_MissingEvent(t *testing.T) {
 
 func TestNotifyHandler_InvalidJSON(t *testing.T) {
 	cfg := DefaultConfig()
-	server := NewServer(cfg)
+	server := newTestServer(cfg)
 
 	body := `{invalid json`
 	req := httptest.NewRequest(http.MethodPost, "/notify", bytes.NewBufferString(body))
@@ -149,7 +155,7 @@ func TestNotifyHandler_InvalidJSON(t *testing.T) {
 
 func TestNotifyHandler_WrongMethod(t *testing.T) {
 	cfg := DefaultConfig()
-	server := NewServer(cfg)
+	server := newTestServer(cfg)
 
 	req := httptest.NewRequest(http.MethodGet, "/notify", nil)
 	w := httptest.NewRecorder()
@@ -167,7 +173,7 @@ func TestNotifyHandler_DisabledEvent(t *testing.T) {
 		EnabledEvents:     []string{"stop"}, // start disabled
 		FutureOverrides:   make(map[string]string),
 	}
-	server := NewServer(cfg)
+	server := newTestServer(cfg)
 
 	body := `{"agent":"test","event":"start"}`
 	req := httptest.NewRequest(http.MethodPost, "/notify", bytes.NewBufferString(body))
@@ -195,7 +201,7 @@ func TestNotifyHandler_ReloadsConfigForStyleChanges(t *testing.T) {
 		t.Fatalf("write config failed: %v", err)
 	}
 
-	server := NewServer(&Config{
+	server := newTestServer(&Config{
 		NotificationStyle: "clean",
 		EnabledEvents:     []string{"start", "stop"},
 		FutureOverrides:   map[string]string{},
@@ -381,7 +387,7 @@ func TestFormatMessage_MultipleFields(t *testing.T) {
 
 func TestHealthHandler(t *testing.T) {
 	cfg := DefaultConfig()
-	server := NewServer(cfg)
+	server := newTestServer(cfg)
 
 	req := httptest.NewRequest(http.MethodGet, "/health", nil)
 	w := httptest.NewRecorder()
@@ -405,7 +411,7 @@ func TestHealthHandler(t *testing.T) {
 
 func TestManifestHandler(t *testing.T) {
 	cfg := DefaultConfig()
-	server := NewServer(cfg)
+	server := newTestServer(cfg)
 
 	req := httptest.NewRequest(http.MethodGet, "/manifest", nil)
 	w := httptest.NewRecorder()
@@ -432,7 +438,7 @@ func TestManifestHandler(t *testing.T) {
 
 func TestHealthHandler_WrongMethod(t *testing.T) {
 	cfg := DefaultConfig()
-	server := NewServer(cfg)
+	server := newTestServer(cfg)
 
 	req := httptest.NewRequest(http.MethodPost, "/health", nil)
 	w := httptest.NewRecorder()
@@ -657,7 +663,7 @@ func TestSettingsHandler_SaveLoadRoundTrip(t *testing.T) {
 
 func TestManifestHandler_ExtendedFields(t *testing.T) {
 	cfg := DefaultConfig()
-	server := NewServer(cfg)
+	server := newTestServer(cfg)
 
 	req := httptest.NewRequest(http.MethodGet, "/manifest", nil)
 	req.Host = "localhost:17891"
@@ -706,7 +712,7 @@ func TestManifestHandler_ExtendedFields(t *testing.T) {
 
 func TestNotifyHandler_RecordsRecentHistory(t *testing.T) {
 	cfg := DefaultConfig()
-	server := NewServer(cfg)
+	server := newTestServer(cfg)
 
 	for i := 0; i < 4; i++ {
 		body := `{"agent":"claude","event":"start","project":"project-` + string(rune('A'+i)) + `","message":"message"}`

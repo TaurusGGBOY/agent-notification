@@ -13,6 +13,12 @@ type ToastNotifier struct {
 	appName string
 }
 
+var (
+	toastCardPathFunc   = toastCardPath
+	renderToastCardFn   = renderToastCard
+	sendToastPowerShell = sendToastViaPowerShell
+)
+
 func NewToastNotifier(appName string) *ToastNotifier {
 	return &ToastNotifier{appName: appName}
 }
@@ -26,7 +32,7 @@ func (n *ToastNotifier) NotifyWithStyle(style, event, title, message, agent stri
 	cardPath := ""
 	if style == "custom-card" {
 		log.Printf("custom-card style detected, generating toast card")
-		path, err := toastCardPath()
+		path, err := toastCardPathFunc()
 		if err != nil {
 			log.Printf("toastCardPath failed: %v", err)
 			return err
@@ -39,7 +45,7 @@ func (n *ToastNotifier) NotifyWithStyle(style, event, title, message, agent stri
 			Project: project,
 			Message: message,
 		}
-		if err := renderToastCard(path, card); err != nil {
+		if err := renderToastCardFn(path, card); err != nil {
 			log.Printf("renderToastCard failed: %v", err)
 			return err
 		}
@@ -48,7 +54,7 @@ func (n *ToastNotifier) NotifyWithStyle(style, event, title, message, agent stri
 	}
 	xml := formatToastXML(style, event, title, agent, project, cardPath)
 	log.Printf("sending toast via PowerShell, XML length: %d", len(xml))
-	if err := sendToastViaPowerShell(n.appName, xml); err != nil {
+	if err := sendToastPowerShell(n.appName, xml); err != nil {
 		log.Printf("Toast notification failed: %v", err)
 		return err
 	}
