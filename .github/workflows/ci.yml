@@ -17,6 +17,8 @@ jobs:
   test:
     name: Unit Tests
     runs-on: windows-latest
+    env:
+      CARGO_BUILD_JOBS: 1
     defaults:
       run:
         shell: pwsh
