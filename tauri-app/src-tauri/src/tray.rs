@@ -113,10 +113,6 @@ async fn get_config() -> Result<serde_json::Value, String> {
 
 async fn set_events_enabled(enabled: bool) -> Result<(), String> {
     let config = get_config().await?;
-    let notification_style = config
-        .get("notificationStyle")
-        .and_then(|v| v.as_str())
-        .unwrap_or("clean");
     let future_overrides = config
         .get("futureOverrides")
         .and_then(|v| serde_json::to_string(v).ok())
@@ -129,7 +125,7 @@ async fn set_events_enabled(enabled: bool) -> Result<(), String> {
     };
     let body = format!(
         r#"{{"notificationStyle":"{}","enabledEvents":{},"futureOverrides":{}}}"#,
-        notification_style, events, future_overrides
+        "clean", events, future_overrides
     );
     post_json("/settings", &body).await
 }

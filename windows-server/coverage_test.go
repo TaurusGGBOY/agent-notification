@@ -116,17 +116,18 @@ func TestTruncateTextHandlesWhitespaceRuneAndSmallLimits(t *testing.T) {
 	}
 }
 
-func TestToastXMLCustomCardAndImageAttributes(t *testing.T) {
-	xml := formatToastXML("custom-card", "start", `Title & "quoted"`, "codex", "Project", `C:\Temp\toast card.png`)
+func TestToastXMLCleanLogoAndImageAttributes(t *testing.T) {
+	xml := formatToastXML("custom-card", "start", `Title & "quoted"`, "message", "codex", "Project", `C:\Temp\app-logo.png`)
 
 	for _, want := range []string{
-		`<image placement="hero"`,
-		`src="C:\Temp\toast card.png"`,
+		`<image placement="appLogoOverride"`,
+		`hint-crop="circle"`,
+		`src="C:\Temp\app-logo.png"`,
 		`Title &amp; &quot;quoted&quot;`,
-		`<text>Project</text>`,
+		`placement="attribution">Project`,
 	} {
 		if !strings.Contains(xml, want) {
-			t.Fatalf("custom card XML missing %q in %s", want, xml)
+			t.Fatalf("clean XML missing %q in %s", want, xml)
 		}
 	}
 
@@ -169,10 +170,13 @@ func TestAgentInitialHandlesEmptyWhitespaceAndUnicode(t *testing.T) {
 	}
 }
 
-func TestStatusColorXMLStartAttribution(t *testing.T) {
-	xml := formatToastXML("status-color", "start", "Agent Started", "codex", "agent-notification", "")
-	if !strings.Contains(xml, `placement="attribution">Started`) {
-		t.Fatalf("status color start XML missing Started attribution: %s", xml)
+func TestFormatToastXMLAlwaysClean(t *testing.T) {
+	xml := formatToastXML("status-color", "start", "Agent Started", "message", "codex", "agent-notification", "")
+	if strings.Contains(xml, `STATUS ·`) || strings.Contains(xml, `<group>`) || strings.Contains(xml, `placement="hero"`) {
+		t.Fatalf("toast XML should stay clean: %s", xml)
+	}
+	if !strings.Contains(xml, `placement="attribution">agent-notification`) {
+		t.Fatalf("clean toast XML missing attribution: %s", xml)
 	}
 }
 
@@ -244,7 +248,7 @@ func TestCurrentConfigFallsBackToCachedConfigOnLoadError(t *testing.T) {
 	}
 
 	cached := &Config{
-		NotificationStyle: "compact",
+		NotificationStyle: "clean",
 		EnabledEvents:     []string{"stop"},
 		FutureOverrides:   map[string]string{},
 	}
@@ -253,8 +257,8 @@ func TestCurrentConfigFallsBackToCachedConfigOnLoadError(t *testing.T) {
 	if got := server.currentConfig(); got != cached {
 		t.Fatal("currentConfig should return cached config when LoadConfig fails")
 	}
-	if server.config.NotificationStyle != "compact" {
-		t.Fatalf("cached style = %q, want compact", server.config.NotificationStyle)
+	if server.config.NotificationStyle != "clean" {
+		t.Fatalf("cached style = %q, want clean", server.config.NotificationStyle)
 	}
 }
 

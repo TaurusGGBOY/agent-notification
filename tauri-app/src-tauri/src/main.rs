@@ -1,7 +1,7 @@
 #![cfg_attr(not(debug_assertions), windows_subsystem = "windows")]
 
-mod service;
 mod notification_settings;
+mod service;
 mod tray;
 
 use tauri::{Manager, Theme};
@@ -39,8 +39,8 @@ fn main() {
             tray::build_tray(app.handle())?;
             if let Some(window) = app.get_webview_window("main") {
                 let _ = window.set_size(tauri::Size::Logical(tauri::LogicalSize {
-                    width: 1200.0,
-                    height: 675.0,
+                    width: 1500.0,
+                    height: 844.0,
                 }));
                 let _ = window.center();
             }
