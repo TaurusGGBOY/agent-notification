@@ -21,4 +21,4 @@ The final app bundle includes the Go server sidecar.
 
 ## Architecture
 
-Tauri owns the tray and command window. The Go server remains the notification engine and listens on `127.0.0.1:17891`.
+Tauri owns the tray and command window. The Go server remains the notification engine, is bundled as a sidecar, listens on `0.0.0.0:17891` for LAN agents, and is controlled locally by the Tauri UI through `127.0.0.1:17891`.
