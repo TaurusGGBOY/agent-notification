@@ -40,6 +40,12 @@ python skills/agent-notify-discovery/scripts/configure_claude.py \
   --scope user
 ```
 
+## Windows One-Click App
+
+Windows users should install and start the one-click Windows app. The app opens the AgentNotify UI, starts the bundled Go server sidecar, listens on `0.0.0.0:17891` for LAN agent notifications, and advertises itself with mDNS.
+
+After opening the app, copy the LAN URL shown in the sidebar into the Claude/Codex setup skill, or let the skill discover the server automatically.
+
 ## Notification Styles
 
 - `clean` — plain, low-distraction
