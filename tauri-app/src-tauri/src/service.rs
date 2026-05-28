@@ -1,5 +1,5 @@
 use std::io::{Read, Write};
-use std::net::TcpStream;
+use std::net::{TcpStream, ToSocketAddrs};
 use std::sync::Mutex;
 use std::time::{Duration, Instant};
 
@@ -8,7 +8,7 @@ use tauri_plugin_shell::process::{CommandChild, CommandEvent};
 use tauri_plugin_shell::ShellExt;
 
 const CONTROL_ADDR: &str = "127.0.0.1:17891";
-// Intentional LAN exposure of the existing Agent Notify HTTP API lets remote agents send notifications.
+// This LAN-only tool intentionally exposes the entire unauthenticated Agent Notify HTTP API on the LAN.
 const SIDECAR_LISTEN_ADDR: &str = "0.0.0.0:17891";
 
 pub fn control_addr() -> &'static str {
@@ -210,7 +210,14 @@ impl Client {
     }
 
     fn get_text(&self, path: &str) -> Result<String, String> {
-        let mut stream = TcpStream::connect(&self.addr).map_err(|err| err.to_string())?;
+        let socket_addr = self
+            .addr
+            .to_socket_addrs()
+            .map_err(|err| format!("failed to resolve {}: {err}", self.addr))?
+            .next()
+            .ok_or_else(|| format!("failed to resolve {}: no socket addresses", self.addr))?;
+        let mut stream = TcpStream::connect_timeout(&socket_addr, self.timeout)
+            .map_err(|err| err.to_string())?;
         stream
             .set_read_timeout(Some(self.timeout))
             .map_err(|err| err.to_string())?;
@@ -269,5 +276,24 @@ mod tests {
     fn rejects_loopback_manifest_urls_for_lan_reuse() {
         assert_eq!(http_url_host_port("http://127.0.0.1:17891/manifest"), None);
         assert_eq!(http_url_host_port("http://localhost:17891/manifest"), None);
+    }
+
+    #[test]
+    fn rejects_non_lan_manifest_urls() {
+        assert_eq!(http_url_host_port("http://0.0.0.0:17891/manifest"), None);
+        assert_eq!(http_url_host_port("http://192.168.1.10:0/manifest"), None);
+        assert_eq!(
+            http_url_host_port("http://user@192.168.1.10:17891/manifest"),
+            None
+        );
+        assert_eq!(
+            http_url_host_port("https://192.168.1.10:17891/manifest"),
+            None
+        );
+        assert_eq!(http_url_host_port("http://[::1]:17891/manifest"), None);
+        assert_eq!(
+            http_url_host_port("http://192.168.1.10:notaport/manifest"),
+            None
+        );
     }
 }
