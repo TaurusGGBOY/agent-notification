@@ -2,6 +2,12 @@
 
 Tauri v2 desktop client for AgentNotify.
 
+## Windows One-Click App
+
+Windows users should install and start the Tauri app from the release package. The app opens the AgentNotify UI, starts the bundled Go server sidecar, listens on `0.0.0.0:17891` for LAN agents, and advertises itself with mDNS.
+
+After opening the app, copy the LAN URL shown in the sidebar into the Claude/Codex setup skill, or let the skill discover the server automatically. The Tauri UI controls the server locally through `127.0.0.1:17891`.
+
 ## Development
 
 ```bash

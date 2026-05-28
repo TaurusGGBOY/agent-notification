@@ -4,6 +4,12 @@ LAN-only notification receiver. Mac/Unix agents send `start`/`stop` events to a 
 
 ## Components
 
+**Windows app** (`tauri-app/`)
+- One-click Windows desktop app
+- Opens the AgentNotify UI and starts the bundled Go server sidecar
+- Server listens on `0.0.0.0:17891` for LAN agent notifications
+- Tauri UI controls the server through `127.0.0.1:17891`
+
 **Windows server** (`windows-server/`)
 - HTTP API on `0.0.0.0:17891`
 - UDP discovery on port `17892`
@@ -16,13 +22,9 @@ LAN-only notification receiver. Mac/Unix agents send `start`/`stop` events to a 
 
 ## Quick Start
 
-### 1. Deploy Windows server
+### 1. Start the Windows app
 
-Copy `windows-server/` to Windows machine:
-```
-start.bat           # Start server
-install-startup.bat # Auto-start on login
-```
+Windows users should install and start the Tauri app from the release package. The one-click Windows app opens the AgentNotify UI, starts the bundled Go server sidecar, listens on `0.0.0.0:17891` for LAN agent notifications, and advertises itself with mDNS.
 
 ### 2. Install skill
 
@@ -42,7 +44,7 @@ python skills/agent-notify-discovery/scripts/configure_claude.py \
 
 ## Windows One-Click App
 
-Windows users should install and start the Tauri app. The one-click Windows app opens the AgentNotify UI, starts the bundled Go server sidecar, listens on `0.0.0.0:17891` for LAN agent notifications, and advertises itself with mDNS.
+Windows users should install and start the Tauri app. The app opens the AgentNotify UI, starts the bundled Go server sidecar, listens on `0.0.0.0:17891` for LAN agent notifications, controls the server locally through `127.0.0.1:17891`, and advertises itself with mDNS.
 
 After opening the app, copy the LAN URL shown in the sidebar into the Claude/Codex setup skill, or let the skill discover the server automatically.
 
