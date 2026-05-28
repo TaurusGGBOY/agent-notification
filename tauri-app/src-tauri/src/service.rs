@@ -7,6 +7,17 @@ use tauri::{AppHandle, Emitter, Manager, State};
 use tauri_plugin_shell::process::{CommandChild, CommandEvent};
 use tauri_plugin_shell::ShellExt;
 
+const CONTROL_ADDR: &str = "127.0.0.1:17891";
+const SIDECAR_LISTEN_ADDR: &str = "0.0.0.0:17891";
+
+pub fn control_addr() -> &'static str {
+    CONTROL_ADDR
+}
+
+pub fn sidecar_listen_addr() -> &'static str {
+    SIDECAR_LISTEN_ADDR
+}
+
 pub struct ServiceState {
     child: Mutex<Option<CommandChild>>,
 }
@@ -26,7 +37,7 @@ pub struct ServiceStatus {
 }
 
 pub fn is_server_healthy() -> bool {
-    let client = match Client::new("127.0.0.1:17891", Duration::from_millis(600)) {
+    let client = match Client::new(control_addr(), Duration::from_millis(600)) {
         Ok(c) => c,
         Err(_) => return false,
     };
@@ -50,7 +61,7 @@ pub fn ensure_sidecar(app: &AppHandle) -> Result<(), String> {
         .map_err(|err| format!("failed to create sidecar command: {err}"))?;
 
     let (mut rx, child) = command
-        .env("AGENT_NOTIFY_HTTP_ADDR", "127.0.0.1:17891")
+        .env("AGENT_NOTIFY_HTTP_ADDR", sidecar_listen_addr())
         .spawn()
         .map_err(|err| format!("failed to spawn sidecar: {err}"))?;
 
@@ -130,5 +141,20 @@ impl Client {
         } else {
             Err(response.lines().next().unwrap_or("empty response").to_string())
         }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::{control_addr, sidecar_listen_addr};
+
+    #[test]
+    fn sidecar_listens_on_all_interfaces_for_lan_agents() {
+        assert_eq!(sidecar_listen_addr(), "0.0.0.0:17891");
+    }
+
+    #[test]
+    fn tauri_controls_server_through_loopback() {
+        assert_eq!(control_addr(), "127.0.0.1:17891");
     }
 }
