@@ -46,8 +46,8 @@ func LoadConfig() (*Config, error) {
 func DefaultConfig() *Config {
 	return &Config{
 		NotificationStyle: "clean",
-		EnabledEvents:     []string{"start", "stop"},
-		FutureOverrides:   make(map[string]string),
+		EnabledEvents:      []string{"start", "stop"},
+		FutureOverrides:    make(map[string]string),
 	}
 }
 
@@ -61,7 +61,12 @@ func (c *Config) IsEventEnabled(event string) bool {
 }
 
 func IsSupportedStyle(style string) bool {
-	return style == "clean"
+	for _, supported := range []string{"clean", "status-color", "agent-badge", "compact", "custom-card"} {
+		if style == supported {
+			return true
+		}
+	}
+	return false
 }
 
 func IsSupportedEvent(event string) bool {

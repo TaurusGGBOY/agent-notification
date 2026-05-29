@@ -10,7 +10,7 @@ func TestDiscoveryTXTContainsContractFields(t *testing.T) {
 	for _, want := range []string{
 		"version=",
 		"events=start,stop",
-		"styles=clean",
+		"styles=clean,status-color,agent-badge,compact",
 		"path=/notify",
 		"settings=/settings",
 	} {

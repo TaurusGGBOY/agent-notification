@@ -1,13 +1,16 @@
 import {
   openWindowsNotificationSettings,
+  saveConfig,
   sendTestNotification,
   setBroadcastEnabled,
+  type NotificationStyle,
 } from "./api";
 import { refreshState } from "./service";
 import { state } from "./state";
 import { applyTheme, getInitialTheme, toggleTheme, type AppTheme } from "./theme";
 import { getCurrentWindow } from "@tauri-apps/api/window";
 
+const notificationStyles: NotificationStyle[] = ["clean", "status-color", "agent-badge", "compact"];
 let currentTheme: AppTheme = getInitialTheme();
 
 export function render(): void {
@@ -16,6 +19,9 @@ export function render(): void {
     throw new Error("missing #app root");
   }
 
+  const config = state.config;
+  const configuredStyle = config?.notificationStyle as NotificationStyle | undefined;
+  const currentStyle = configuredStyle && notificationStyles.includes(configuredStyle) ? configuredStyle : "clean";
   const serviceUrl = state.manifest?.url ?? "等待服务地址";
   const version = state.manifest?.version ?? "未知";
   const broadcastEnabled = state.broadcast?.enabled ?? false;
@@ -77,7 +83,7 @@ export function render(): void {
         <header class="topbar">
           <div class="topbar-title drag-region" data-drag-region>
             <h1>通知控制台</h1>
-            <p>本机 Agent 通知服务、广播和历史</p>
+            <p>本机 Agent 通知服务、样式、广播和历史</p>
           </div>
           <div class="top-actions">
             <button class="icon-button" data-action="theme" title="切换明暗模式">${currentTheme === "light" ? "☾" : "☀"}</button>
@@ -87,6 +93,38 @@ export function render(): void {
         ${state.error ? `<section class="notice">${escapeHtml(formatError(state.error))}</section>` : ""}
 
         <section class="dashboard-grid">
+          <section class="card style-card">
+            <div class="card-head">
+              <div class="card-icon blue">▤</div>
+              <div>
+                <h2>通知样式</h2>
+                <p>选择系统通知的显示方式</p>
+              </div>
+            </div>
+            <div class="segmented">
+              ${notificationStyles
+                .map(
+                  (style) => `
+                    <button class="segment ${style === currentStyle ? "active" : ""}" data-style="${style}">
+                      ${labelForStyle(style)}
+                    </button>
+                  `,
+                )
+                .join("")}
+            </div>
+          </section>
+
+          <section class="card preview-panel">
+            <div class="card-head">
+              <div class="card-icon orange">◴</div>
+              <div>
+                <h2>通知预览</h2>
+                <p>${previewText(currentStyle)}</p>
+              </div>
+            </div>
+            ${previewMarkup(currentStyle)}
+          </section>
+
           <section class="card history-card">
             <div class="card-head">
               <div class="card-icon blue">◷</div>
@@ -108,6 +146,18 @@ export function render(): void {
 }
 
 function bindEvents(): void {
+  document.querySelectorAll<HTMLButtonElement>("[data-style]").forEach((button) => {
+    button.addEventListener("click", async () => {
+      if (!state.config) return;
+      const style = button.dataset.style as NotificationStyle;
+      state.config = { ...state.config, notificationStyle: style };
+      render();
+      await saveConfig(state.config);
+      await refreshState();
+      render();
+    });
+  });
+
   document.querySelector<HTMLButtonElement>('[data-action="test"]')?.addEventListener("click", async () => {
     await sendTestNotification("start");
     await refreshState();
@@ -134,7 +184,9 @@ function bindEvents(): void {
 
   document.querySelector<HTMLButtonElement>('[data-action="windows-notifications"]')?.addEventListener("click", async () => {
     await openWindowsNotificationSettings();
-    pollWindowsNotificationStatus();
+    window.setTimeout(() => {
+      void refreshState().then(render);
+    }, 1000);
   });
 
   document.querySelectorAll<HTMLElement>("[data-drag-region]").forEach((element) => {
@@ -145,22 +197,67 @@ function bindEvents(): void {
   });
 }
 
-function pollWindowsNotificationStatus(): void {
-  let attempts = 0;
-  const refresh = async () => {
-    attempts += 1;
-    await refreshState();
-    render();
-    if (attempts < 15) {
-      window.setTimeout(() => {
-        void refresh();
-      }, 1000);
-    }
+function labelForStyle(style: NotificationStyle): string {
+  const labels: Record<NotificationStyle, string> = {
+    clean: "简洁",
+    "status-color": "状态",
+    "agent-badge": "徽章",
+    compact: "紧凑",
   };
+  return labels[style];
+}
 
-  window.setTimeout(() => {
-    void refresh();
-  }, 600);
+function previewText(style: NotificationStyle): string {
+  if (style === "status-color") return "用状态色条突出启动或停止事件。";
+  if (style === "agent-badge") return "突出 Agent 身份和项目来源。";
+  if (style === "compact") return "适合高频事件的一行紧凑通知。";
+  return "最接近系统默认通知的清爽布局。";
+}
+
+function previewMarkup(style: NotificationStyle): string {
+  if (style === "status-color") {
+    return `
+      <div class="toast-preview preview-status">
+        <span class="status-bar"></span>
+        <div>
+          <strong>Agent 已启动</strong>
+          <span class="state-tag">START</span>
+          <p>AgentNotify 正在处理本地任务通知。</p>
+        </div>
+      </div>
+    `;
+  }
+  if (style === "agent-badge") {
+    return `
+      <div class="toast-preview preview-badge">
+        <div class="agent-badge">AI</div>
+        <div>
+          <strong>Claude Code</strong>
+          <span>agent-notification</span>
+          <p>任务完成，通知已发送到 Windows。</p>
+        </div>
+      </div>
+    `;
+  }
+  if (style === "compact") {
+    return `
+      <div class="toast-preview preview-compact">
+        <strong>22:30</strong>
+        <span>START</span>
+        <p>AgentNotify · 测试通知</p>
+      </div>
+    `;
+  }
+  return `
+    <div class="toast-preview preview-clean">
+      <div class="toast-logo">A</div>
+      <div>
+        <strong>系统通知预览</strong>
+        <span>agent-notification</span>
+        <p>适合多数事件的标准通知。</p>
+      </div>
+    </div>
+  `;
 }
 
 function historyMarkup(): string {

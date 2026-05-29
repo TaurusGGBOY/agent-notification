@@ -9,24 +9,26 @@ import (
 	"testing"
 )
 
-func withFakeToastDeps(t *testing.T) (*string, *string) {
+func withFakeToastDeps(t *testing.T) (*string, *string, *ToastCard) {
 	t.Helper()
 
-	oldLogoPath := toastLogoPathFunc
-	oldRenderLogo := renderToastLogoFn
+	oldPath := toastCardPathFunc
+	oldRender := renderToastCardFn
 	oldSend := sendToastPowerShell
 	t.Cleanup(func() {
-		toastLogoPathFunc = oldLogoPath
-		renderToastLogoFn = oldRenderLogo
+		toastCardPathFunc = oldPath
+		renderToastCardFn = oldRender
 		sendToastPowerShell = oldSend
 	})
 
 	var sentAppID string
 	var sentXML string
-	toastLogoPathFunc = func() (string, error) {
-		return `C:\Temp\agent-logo.png`, nil
+	var renderedCard ToastCard
+	toastCardPathFunc = func() (string, error) {
+		return `C:\Temp\agent-card.png`, nil
 	}
-	renderToastLogoFn = func(path string) error {
+	renderToastCardFn = func(path string, card ToastCard) error {
+		renderedCard = card
 		return nil
 	}
 	sendToastPowerShell = func(appID, xml string) error {
@@ -34,11 +36,11 @@ func withFakeToastDeps(t *testing.T) (*string, *string) {
 		sentXML = xml
 		return nil
 	}
-	return &sentAppID, &sentXML
+	return &sentAppID, &sentXML, &renderedCard
 }
 
 func TestWindowsToastNotifierNotifyUsesCleanStyle(t *testing.T) {
-	appID, xml := withFakeToastDeps(t)
+	appID, xml, _ := withFakeToastDeps(t)
 	notifier := NewToastNotifier("AgentNotify")
 
 	if err := notifier.Notify("Title", "Message"); err != nil {
@@ -47,13 +49,13 @@ func TestWindowsToastNotifierNotifyUsesCleanStyle(t *testing.T) {
 	if *appID != "AgentNotify" {
 		t.Fatalf("appID = %q, want AgentNotify", *appID)
 	}
-	if !strings.Contains(*xml, `>Title</text>`) {
+	if !strings.Contains(*xml, "<text>Title</text>") {
 		t.Fatalf("clean toast XML missing title: %s", *xml)
 	}
 }
 
 func TestWindowsToastNotifierNotifyWithStyleSendsFormattedXML(t *testing.T) {
-	appID, xml := withFakeToastDeps(t)
+	appID, xml, _ := withFakeToastDeps(t)
 	notifier := NewToastNotifier("AgentNotify")
 
 	if err := notifier.NotifyWithStyle("agent-badge", "start", "Agent Started", "message", "codex"); err != nil {
@@ -62,52 +64,49 @@ func TestWindowsToastNotifierNotifyWithStyleSendsFormattedXML(t *testing.T) {
 	if *appID != "AgentNotify" {
 		t.Fatalf("appID = %q, want AgentNotify", *appID)
 	}
-	if !strings.Contains(*xml, `Project: message`) && !strings.Contains(*xml, `message`) {
-		t.Fatalf("toast XML missing message: %s", *xml)
-	}
-	if !strings.Contains(*xml, `placement="appLogoOverride"`) {
-		t.Fatalf("toast XML missing app logo: %s", *xml)
+	if !strings.Contains(*xml, `placement="attribution">Agent C`) {
+		t.Fatalf("agent badge XML missing attribution: %s", *xml)
 	}
 }
 
-func TestWindowsToastNotifierUsesSingleCleanStyleWithLogo(t *testing.T) {
-	_, xml := withFakeToastDeps(t)
+func TestWindowsToastNotifierCustomCardRendersImage(t *testing.T) {
+	_, xml, card := withFakeToastDeps(t)
 	notifier := NewToastNotifier("AgentNotify")
 
 	if err := notifier.NotifyWithStyle("custom-card", "stop", "Agent Stopped", "done", "claude"); err != nil {
-		t.Fatalf("NotifyWithStyle failed: %v", err)
+		t.Fatalf("custom card NotifyWithStyle failed: %v", err)
 	}
-	if strings.Contains(*xml, `placement="hero"`) {
-		t.Fatalf("toast XML should not use hero image: %s", *xml)
+	if card.Event != "stop" || card.Title != "Agent Stopped" || card.Agent != "claude" || card.Message != "done" {
+		t.Fatalf("rendered card = %+v", *card)
 	}
-	if !strings.Contains(*xml, `placement="appLogoOverride"`) || !strings.Contains(*xml, `agent-logo.png`) {
-		t.Fatalf("toast XML missing app logo image: %s", *xml)
+	if !strings.Contains(*xml, `placement="hero"`) || !strings.Contains(*xml, `agent-card.png`) {
+		t.Fatalf("custom card XML missing image: %s", *xml)
 	}
 }
 
-func TestWindowsToastNotifierIgnoresLogoPathError(t *testing.T) {
+func TestWindowsToastNotifierReturnsCardPathError(t *testing.T) {
 	withFakeToastDeps(t)
 	wantErr := errors.New("path failed")
-	toastLogoPathFunc = func() (string, error) {
+	toastCardPathFunc = func() (string, error) {
 		return "", wantErr
 	}
 
 	err := NewToastNotifier("AgentNotify").NotifyWithStyle("custom-card", "start", "title", "message", "agent")
-	if err != nil {
-		t.Fatalf("logo path error should not block notification: %v", err)
+	if !errors.Is(err, wantErr) {
+		t.Fatalf("error = %v, want %v", err, wantErr)
 	}
 }
 
-func TestWindowsToastNotifierIgnoresLogoRenderError(t *testing.T) {
+func TestWindowsToastNotifierReturnsRenderError(t *testing.T) {
 	withFakeToastDeps(t)
 	wantErr := errors.New("render failed")
-	renderToastLogoFn = func(path string) error {
+	renderToastCardFn = func(path string, card ToastCard) error {
 		return wantErr
 	}
 
 	err := NewToastNotifier("AgentNotify").NotifyWithStyle("custom-card", "start", "title", "message", "agent")
-	if err != nil {
-		t.Fatalf("logo render error should not block notification: %v", err)
+	if !errors.Is(err, wantErr) {
+		t.Fatalf("error = %v, want %v", err, wantErr)
 	}
 }
 
@@ -121,19 +120,6 @@ func TestWindowsToastNotifierReturnsSendError(t *testing.T) {
 	err := NewToastNotifier("AgentNotify").NotifyWithStyle("clean", "start", "title", "message", "agent")
 	if !errors.Is(err, wantErr) {
 		t.Fatalf("error = %v, want %v", err, wantErr)
-	}
-}
-
-func TestNewHiddenPowerShellCommandSuppressesWindow(t *testing.T) {
-	cmd := newHiddenPowerShellCommand("Write-Output ok")
-	if cmd.SysProcAttr == nil {
-		t.Fatal("PowerShell command should set SysProcAttr")
-	}
-	if !cmd.SysProcAttr.HideWindow {
-		t.Fatal("PowerShell command should hide its window")
-	}
-	if cmd.SysProcAttr.CreationFlags&createNoWindow == 0 {
-		t.Fatalf("PowerShell command CreationFlags = %#x, want CREATE_NO_WINDOW", cmd.SysProcAttr.CreationFlags)
 	}
 }
 

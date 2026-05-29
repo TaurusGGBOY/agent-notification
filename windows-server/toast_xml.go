@@ -5,86 +5,82 @@ import (
 	"strings"
 )
 
-func formatToastXML(style, event, title, message, agent, project, logoImagePath string) string {
-	_ = style
-	_ = event
-	_ = agent
-	return buildCleanXML(title, message, project, logoImagePath)
+func formatToastXML(style, event, title, agent, project, cardImagePath string) string {
+	switch style {
+	case "status-color":
+		return buildStatusColorXML(event, title, project)
+	case "agent-badge":
+		return buildAgentBadgeXML(event, title, agent, project)
+	case "compact":
+		return buildCompactXML(title)
+	case "custom-card":
+		return buildCustomCardXML(title, project, cardImagePath)
+	default:
+		return buildCleanXML(title, project)
+	}
 }
 
-func buildCleanXML(title, message, project, logoImagePath string) string {
-	var sb strings.Builder
-	startToastBinding(&sb)
-	appendToastImage(&sb, logoImagePath, "appLogoOverride", "circle")
-	appendToastText(&sb, title, ` hint-style="base" hint-wrap="false"`)
-	appendToastText(&sb, message, ` hint-style="captionSubtle" hint-wrap="true"`)
-	appendToastAttribution(&sb, project)
-	endToastBinding(&sb)
-	return sb.String()
+func buildCleanXML(title, project string) string {
+	return buildToastXML(title, project, "", "", "", "")
+}
+
+func buildStatusColorXML(event, title, project string) string {
+	status := "Stopped"
+	if event == "start" {
+		status = "Started"
+	}
+	return buildToastXML(title, project, "", "", "", status)
+}
+
+func buildAgentBadgeXML(event, title, agent, project string) string {
+	_ = event
+	initial := agentInitial(agent)
+	return buildToastXML(title, project, "", "", "", "Agent "+initial)
+}
+
+func buildCompactXML(title string) string {
+	return `<toast><visual><binding template="ToastGeneric"><text>` + escapeXML(title) + `</text></binding></visual></toast>`
+}
+
+func buildCustomCardXML(title, project, cardImagePath string) string {
+	return buildToastXML(title, project, cardImagePath, "hero", "", "")
 }
 
 func buildToastXML(title, project, imagePath, placement, crop, attribution string) string {
 	var sb strings.Builder
-	startToastBinding(&sb)
-	appendToastText(&sb, title, "")
+	sb.WriteString(`<toast><visual><binding template="ToastGeneric">`)
+	sb.WriteString(`<text>`)
+	sb.WriteString(escapeXML(title))
+	sb.WriteString(`</text>`)
 	if project != "" {
-		appendToastText(&sb, project, "")
+		sb.WriteString(`<text>`)
+		sb.WriteString(escapeXML(project))
+		sb.WriteString(`</text>`)
 	}
 	if attribution != "" {
-		appendToastAttribution(&sb, attribution)
+		sb.WriteString(`<text placement="attribution">`)
+		sb.WriteString(escapeXML(attribution))
+		sb.WriteString(`</text>`)
 	}
 	if imagePath != "" {
-		appendToastImage(&sb, imagePath, placement, crop)
+		sb.WriteString(`<image`)
+		if placement != "" {
+			sb.WriteString(` placement="`)
+			sb.WriteString(escapeXML(placement))
+			sb.WriteString(`"`)
+		}
+		sb.WriteString(` src="`)
+		sb.WriteString(escapeXML(normalizeToastImagePath(imagePath)))
+		sb.WriteString(`"`)
+		if crop != "" {
+			sb.WriteString(` hint-crop="`)
+			sb.WriteString(escapeXML(crop))
+			sb.WriteString(`"`)
+		}
+		sb.WriteString(`/>`)
 	}
-	endToastBinding(&sb)
-	return sb.String()
-}
-
-func startToastBinding(sb *strings.Builder) {
-	sb.WriteString(`<toast><visual><binding template="ToastGeneric">`)
-}
-
-func endToastBinding(sb *strings.Builder) {
 	sb.WriteString(`</binding></visual></toast>`)
-}
-
-func appendToastText(sb *strings.Builder, text, attrs string) {
-	if strings.TrimSpace(text) == "" {
-		return
-	}
-	sb.WriteString(`<text`)
-	sb.WriteString(attrs)
-	sb.WriteString(`>`)
-	sb.WriteString(escapeXML(text))
-	sb.WriteString(`</text>`)
-}
-
-func appendToastAttribution(sb *strings.Builder, text string) {
-	if strings.TrimSpace(text) == "" {
-		return
-	}
-	appendToastText(sb, text, ` placement="attribution"`)
-}
-
-func appendToastImage(sb *strings.Builder, imagePath, placement, crop string) {
-	if strings.TrimSpace(imagePath) == "" {
-		return
-	}
-	sb.WriteString(`<image`)
-	if placement != "" {
-		sb.WriteString(` placement="`)
-		sb.WriteString(escapeXML(placement))
-		sb.WriteString(`"`)
-	}
-	sb.WriteString(` src="`)
-	sb.WriteString(escapeXML(normalizeToastImagePath(imagePath)))
-	sb.WriteString(`"`)
-	if crop != "" {
-		sb.WriteString(` hint-crop="`)
-		sb.WriteString(escapeXML(crop))
-		sb.WriteString(`"`)
-	}
-	sb.WriteString(`/>`)
+	return sb.String()
 }
 
 func normalizeToastImagePath(path string) string {

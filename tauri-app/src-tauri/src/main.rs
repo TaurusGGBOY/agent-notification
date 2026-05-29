@@ -1,7 +1,7 @@
 #![cfg_attr(not(debug_assertions), windows_subsystem = "windows")]
 
-mod notification_settings;
 mod service;
+mod notification_settings;
 mod tray;
 
 use tauri::{Manager, Theme};

@@ -23,6 +23,12 @@ h2{color:#fff;font-size:1.1rem;margin:1.5rem 0 .75rem}
 .status{display:flex;gap:2rem;background:#16213e;padding:1rem;border-radius:8px;margin-bottom:1.5rem}
 .status-item span{display:block;color:#888;font-size:.85rem}
 .status-item strong{color:#00d4ff;font-size:1.2rem}
+.card-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(200px,1fr));gap:1rem;margin-bottom:1.5rem}
+.preset-card{background:#16213e;border:2px solid #333;border-radius:8px;padding:1rem;cursor:pointer;transition:all .2s}
+.preset-card:hover{border-color:#555}
+.preset-card.selected{border-color:#00d4ff;background:#1a2a4a}
+.preset-card h3{color:#fff;margin-bottom:.5rem}
+.preset-card p{color:#888;font-size:.85rem}
 .toggles{display:flex;gap:1rem;margin-bottom:1.5rem}
 .toggle-btn{padding:.75rem 1.5rem;border:none;border-radius:6px;cursor:pointer;font-size:1rem;transition:all .2s}
 .toggle-btn.start{background:#1e5128;color:#4ade80}
@@ -37,6 +43,17 @@ h2{color:#fff;font-size:1.1rem;margin:1.5rem 0 .75rem}
 .btn-primary:hover{background:#00b8d9}
 .btn-secondary{background:#333;color:#fff}
 .btn-secondary:hover{background:#444}
+.preview{background:#0a0a1a;border-radius:8px;padding:1.5rem;margin-bottom:1.5rem}
+.preview h3{color:#888;margin-bottom:1rem;font-size:.9rem}
+.toast-preview{padding:1rem;border-radius:6px;margin-bottom:.75rem;transition:all .3s}
+.toast-preview.clean{background:#1e293b}
+.toast-preview.status-color{background:#1e293b;border-left:4px solid #4ade80}
+.toast-preview.agent-badge{background:#1e293b;display:flex;align-items:center;gap:.75rem}
+.toast-preview.agent-badge .avatar{width:40px;height:40px;border-radius:50%;background:#00d4ff;display:flex;align-items:center;justify-content:center;font-weight:bold;color:#1a1a2e}
+.toast-preview.compact{background:#1e293b;padding:.5rem 1rem;font-size:.9rem}
+.toast-title{color:#fff;font-weight:600;margin-bottom:.25rem}
+.toast-message{color:#aaa;font-size:.9rem}
+.toast-preview.agent-badge .toast-title{color:#00d4ff}
 .hidden{display:none}
 #toastResult{margin-top:1rem;padding:1rem;border-radius:6px}
 #toastResult.success{background:#1e5128;color:#4ade80}
@@ -53,10 +70,42 @@ h2{color:#fff;font-size:1.1rem;margin:1.5rem 0 .75rem}
 <div class="status-item"><span>配置文件</span><strong id="configPath">加载中...</strong></div>
 </div>
 
+<h2>通知样式</h2>
+<div class="card-grid" id="styleGrid">
+<div class="preset-card selected" data-style="clean" onclick="selectStyle('clean')">
+<h3>🧹 简洁</h3>
+<p>无干扰，最小化</p>
+</div>
+<div class="preset-card" data-style="status-color" onclick="selectStyle('status-color')">
+<h3>🎨 状态颜色</h3>
+<p>根据事件类型着色</p>
+</div>
+<div class="preset-card" data-style="agent-badge" onclick="selectStyle('agent-badge')">
+<h3>🏷️ 代理徽章</h3>
+<p>显示代理头像</p>
+</div>
+<div class="preset-card" data-style="compact" onclick="selectStyle('compact')">
+<h3>📦 紧凑</h3>
+<p>占用空间最小</p>
+</div>
+</div>
+
 <h2>启用事件</h2>
 <div class="toggles">
 <button class="toggle-btn start active" id="toggleStart" onclick="toggleEvent('start')">▶ 启动事件</button>
 <button class="toggle-btn stop active" id="toggleStop" onclick="toggleEvent('stop')">⏹ 停止事件</button>
+</div>
+
+<h2>预览</h2>
+<div class="preview">
+<div class="toast-preview clean" id="previewStart">
+<div class="toast-title">🚀 Agent Start: claude</div>
+<div class="toast-message">Project: my-project | CWD: ~/code</div>
+</div>
+<div class="toast-preview clean" id="previewStop">
+<div class="toast-title">⏹️ Agent Stop: claude</div>
+<div class="toast-message">Project: my-project | CWD: ~/code</div>
+</div>
 </div>
 
 <div class="actions">
@@ -78,9 +127,20 @@ async function loadConfig() {
   document.getElementById('serverStatus').textContent = '运行中';
   document.getElementById('configPath').textContent = config._path || '%APPDATA%\\AgentNotify\\config.json';
 
-  config.notificationStyle = 'clean';
+  document.querySelectorAll('.preset-card').forEach(c => {
+    c.classList.toggle('selected', c.dataset.style === config.notificationStyle);
+  });
 
+  updatePreview();
   updateToggles();
+}
+
+function selectStyle(style) {
+  config.notificationStyle = style;
+  document.querySelectorAll('.preset-card').forEach(c => {
+    c.classList.toggle('selected', c.dataset.style === style);
+  });
+  updatePreview();
 }
 
 function toggleEvent(event) {
@@ -100,9 +160,29 @@ function updateToggles() {
   document.getElementById('toggleStop').classList.toggle('active', stopActive);
 }
 
+function updatePreview() {
+  const style = config.notificationStyle;
+  const previewStart = document.getElementById('previewStart');
+  const previewStop = document.getElementById('previewStop');
+
+  previewStart.className = 'toast-preview ' + style;
+  previewStop.className = 'toast-preview ' + style;
+
+  if (style === 'agent-badge') {
+    previewStart.innerHTML = '<div class="avatar">C</div><div><div class="toast-title">🚀 Agent Start: claude</div><div class="toast-message">Project: my-project</div></div>';
+    previewStop.innerHTML = '<div class="avatar">C</div><div><div class="toast-title">⏹️ Agent Stop: claude</div><div class="toast-message">Project: my-project</div></div>';
+  } else if (style === 'status-color') {
+    previewStart.innerHTML = '<div class="toast-title" style="color:#4ade80">🚀 Agent Start: claude</div><div class="toast-message">Project: my-project | CWD: ~/code</div>';
+    previewStop.innerHTML = '<div class="toast-title" style="color:#f87171">⏹️ Agent Stop: claude</div><div class="toast-message">Project: my-project | CWD: ~/code</div>';
+  } else {
+    previewStart.innerHTML = '<div class="toast-title">🚀 Agent Start: claude</div><div class="toast-message">Project: my-project | CWD: ~/code</div>';
+    previewStop.innerHTML = '<div class="toast-title">⏹️ Agent Stop: claude</div><div class="toast-message">Project: my-project | CWD: ~/code</div>';
+  }
+}
+
 async function saveSettings() {
   const saveData = {
-    notificationStyle: 'clean',
+    notificationStyle: config.notificationStyle,
     enabledEvents: config.enabledEvents,
     futureOverrides: config.futureOverrides || {}
   };
@@ -253,9 +333,9 @@ func (h *ConfigHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 
 	cfgMap := map[string]interface{}{
 		"notificationStyle": cfg.NotificationStyle,
-		"enabledEvents":     cfg.EnabledEvents,
-		"futureOverrides":   cfg.FutureOverrides,
-		"_path":             h.getConfigPath(),
+		"enabledEvents":      cfg.EnabledEvents,
+		"futureOverrides":    cfg.FutureOverrides,
+		"_path":              h.getConfigPath(),
 	}
 
 	w.Header().Set("Content-Type", "application/json")
@@ -270,7 +350,13 @@ func (h *ConfigHandler) getConfigPath() string {
 	return filepath.Join(cfgDir, "AgentNotify", "config.json")
 }
 
-var validStyles = map[string]bool{"clean": true}
+var validStyles = map[string]bool{
+	"clean":        true,
+	"status-color": true,
+	"agent-badge":  true,
+	"compact":      true,
+	"custom-card":  true,
+}
 
 var validEvents = map[string]bool{
 	"start": true,
