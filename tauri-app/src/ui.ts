@@ -26,6 +26,16 @@ export function render(): void {
   const version = state.manifest?.version ?? "未知";
   const broadcastEnabled = state.broadcast?.enabled ?? false;
   const windowsNotificationsEnabled = state.windowsNotifications?.enabled === true;
+  const windowsNotificationsSupported = state.windowsNotifications?.supported === true;
+  const windowsNotificationStatus = state.windowsNotificationError
+    ? "不可用"
+    : state.windowsNotifications
+      ? windowsNotificationsSupported
+        ? ""
+        : "仅 Windows"
+      : "检测中";
+  const windowsNotificationDisabled = !windowsNotificationsSupported || Boolean(state.windowsNotificationError);
+  const windowsNotificationTitle = windowsNotificationDisabled ? "当前环境不可用" : "打开 Windows 通知设置";
 
   app.innerHTML = `
     <section class="app-shell">
@@ -54,12 +64,16 @@ export function render(): void {
             </button>
           </div>
           <div class="notification-row">
-            <span>Windows 通知</span>
+            <span class="summary-label">
+              Windows 通知
+              ${windowsNotificationStatus ? `<em>${escapeHtml(windowsNotificationStatus)}</em>` : ""}
+            </span>
             <button
               class="switch ${windowsNotificationsEnabled ? "on" : ""}"
               data-action="windows-notifications"
-              title="打开 Windows 通知设置"
+              title="${escapeHtml(windowsNotificationTitle)}"
               aria-pressed="${windowsNotificationsEnabled}"
+              ${windowsNotificationDisabled ? "disabled" : ""}
             >
               <i></i>
             </button>
@@ -183,10 +197,14 @@ function bindEvents(): void {
   });
 
   document.querySelector<HTMLButtonElement>('[data-action="windows-notifications"]')?.addEventListener("click", async () => {
-    await openWindowsNotificationSettings();
-    window.setTimeout(() => {
-      void refreshState().then(render);
-    }, 1000);
+    if (state.windowsNotifications?.supported !== true) return;
+    try {
+      await openWindowsNotificationSettings();
+      pollWindowsNotificationStatus();
+    } catch (err) {
+      state.windowsNotificationError = err instanceof Error ? err.message : String(err);
+      render();
+    }
   });
 
   document.querySelectorAll<HTMLElement>("[data-drag-region]").forEach((element) => {
@@ -195,6 +213,24 @@ function bindEvents(): void {
       void getCurrentWindow().startDragging();
     });
   });
+}
+
+function pollWindowsNotificationStatus(): void {
+  let attempts = 0;
+  const refresh = async () => {
+    attempts += 1;
+    await refreshState();
+    render();
+    if (attempts < 15) {
+      window.setTimeout(() => {
+        void refresh();
+      }, 1000);
+    }
+  };
+
+  window.setTimeout(() => {
+    void refresh();
+  }, 600);
 }
 
 function labelForStyle(style: NotificationStyle): string {

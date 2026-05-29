@@ -7,12 +7,15 @@ const NOTIFICATION_SETTINGS_ROOT: &str =
 #[derive(Debug, Clone, Copy, Serialize)]
 pub struct WindowsNotificationStatus {
     pub enabled: bool,
+    pub supported: bool,
 }
 
 #[tauri::command]
 pub fn windows_notification_status() -> WindowsNotificationStatus {
+    let supported = windows_notifications_supported();
     WindowsNotificationStatus {
-        enabled: query_windows_notification_enabled().unwrap_or(false),
+        enabled: supported && query_windows_notification_enabled().unwrap_or(false),
+        supported,
     }
 }
 
@@ -85,6 +88,10 @@ fn open_notification_settings() -> Result<(), String> {
     Err("Windows notification settings are only available on Windows".to_string())
 }
 
+fn windows_notifications_supported() -> bool {
+    cfg!(windows)
+}
+
 #[cfg(test)]
 mod tests {
     use super::{parse_notification_enabled, parse_registry_dword};
@@ -122,5 +129,12 @@ HKEY_CURRENT_USER\Software\Microsoft\Windows\CurrentVersion\Notifications\Settin
     fn parses_decimal_registry_value() {
         assert_eq!(parse_registry_dword("1"), Some(true));
         assert_eq!(parse_registry_dword("0"), Some(false));
+    }
+
+    #[test]
+    fn windows_notification_status_reports_platform_support() {
+        let status = super::windows_notification_status();
+
+        assert_eq!(status.supported, cfg!(windows));
     }
 }
