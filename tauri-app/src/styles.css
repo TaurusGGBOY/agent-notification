@@ -76,11 +76,6 @@ button {
   color: var(--text);
 }
 
-:root[data-runtime="tauri"] .app-shell {
-  width: calc(100vw * var(--runtime-scale, 1));
-  height: calc(100vh * var(--runtime-scale, 1));
-}
-
 .sidebar {
   display: flex;
   flex-direction: column;

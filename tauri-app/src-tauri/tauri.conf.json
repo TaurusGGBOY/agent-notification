@@ -14,8 +14,8 @@
       {
         "label": "main",
         "title": "AgentNotify",
-        "width": 1500,
-        "height": 844,
+        "width": 1200,
+        "height": 675,
         "resizable": false,
         "fullscreen": false,
         "theme": "Light",
