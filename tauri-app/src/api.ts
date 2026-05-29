@@ -27,6 +27,7 @@ export interface BroadcastStatus {
 
 export interface WindowsNotificationStatus {
   enabled: boolean;
+  supported: boolean;
 }
 
 export interface NotificationHistoryItem {
