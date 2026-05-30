@@ -267,36 +267,35 @@ func (s *Server) currentConfig() *Config {
 }
 
 func formatTitle(agent, event string) string {
-	eventEmoji := map[string]string{
-		"start": "🚀",
-		"stop":  "⏹️",
+	agent = strings.TrimSpace(agent)
+	if agent == "" {
+		agent = "unknown"
 	}
-
-	emoji := eventEmoji[event]
-	if emoji == "" {
-		emoji = "📢"
-	}
-
-	return emoji + " Agent " + strings.Title(event) + ": " + agent
+	return eventLabel(event) + " · " + agent
 }
 
 func formatMessage(payload NotifyPayload) string {
 	parts := []string{}
 
-	if payload.Project != "" {
-		parts = append(parts, "Project: "+payload.Project)
-	}
-
 	workdir := strings.TrimSpace(payload.Cwd)
 	if workdir == "" {
 		workdir = strings.TrimSpace(payload.Workdir)
 	}
+	project := strings.TrimSpace(payload.Project)
+	if workdir == "" && looksLikePath(project) {
+		workdir = project
+		project = ""
+	}
 	if workdir != "" {
-		parts = append(parts, "CWD: "+workdir)
+		parts = append(parts, "DIR: "+workdir)
 	}
 
-	if payload.Message != "" {
-		parts = append(parts, payload.Message)
+	if project != "" && project != workdir && !strings.EqualFold(project, "unknown") {
+		parts = append(parts, "PROJECT: "+project)
+	}
+
+	if message := strings.TrimSpace(payload.Message); message != "" {
+		parts = append(parts, message)
 	}
 
 	if payload.Timestamp != "" {
@@ -312,4 +311,26 @@ func formatMessage(payload NotifyPayload) string {
 	}
 
 	return strings.Join(parts, " | ")
+}
+
+func eventLabel(event string) string {
+	switch strings.ToLower(strings.TrimSpace(event)) {
+	case "start":
+		return "START"
+	case "stop":
+		return "STOP"
+	default:
+		return "EVENT"
+	}
+}
+
+func looksLikePath(value string) bool {
+	value = strings.TrimSpace(value)
+	if value == "" {
+		return false
+	}
+	return strings.HasPrefix(value, "/") ||
+		strings.HasPrefix(value, "~/") ||
+		strings.Contains(value, `\`) ||
+		strings.Contains(value, "/")
 }

@@ -92,6 +92,26 @@ func TestRenderToastCardWritesScaledPNGWithEventAccent(t *testing.T) {
 	}
 }
 
+func TestToastCardSummaryLinesPrioritizeEventAgentAndDirectory(t *testing.T) {
+	card := ToastCard{
+		Event:   "stop",
+		Title:   "STOP · codex",
+		Agent:   "codex",
+		Message: "DIR: /Users/me/project | PROJECT: agent-notification | done",
+	}
+
+	eventAgent, directory, detail := toastCardSummaryLines(card)
+	if eventAgent != "STOP · codex" {
+		t.Fatalf("eventAgent = %q, want STOP · codex", eventAgent)
+	}
+	if directory != "/Users/me/project" {
+		t.Fatalf("directory = %q, want /Users/me/project", directory)
+	}
+	if detail != "PROJECT: agent-notification | done" {
+		t.Fatalf("detail = %q, want project detail", detail)
+	}
+}
+
 func TestDrawCircleOnlyPaintsInsideBounds(t *testing.T) {
 	img := image.NewRGBA(image.Rect(0, 0, 20, 20))
 	drawCircle(img, 0, 0, 5, image.Black)

@@ -325,11 +325,11 @@ func TestFormatTitle(t *testing.T) {
 		event  string
 		expect string
 	}{
-		{"claude", "start", "🚀 Agent Start: claude"},
-		{"claude", "stop", "⏹️ Agent Stop: claude"},
-		{"test-agent", "start", "🚀 Agent Start: test-agent"},
-		{"", "start", "🚀 Agent Start: "},
-		{"claude", "unknown", "📢 Agent Unknown: claude"},
+		{"claude", "start", "START · claude"},
+		{"claude", "stop", "STOP · claude"},
+		{"test-agent", "start", "START · test-agent"},
+		{"", "start", "START · unknown"},
+		{"claude", "unknown", "EVENT · claude"},
 	}
 
 	for _, tt := range tests {
@@ -349,12 +349,12 @@ func TestFormatMessage(t *testing.T) {
 		{
 			name:     "with project",
 			payload:  NotifyPayload{Project: "my-project"},
-			contains: "Project: my-project",
+			contains: "PROJECT: my-project",
 		},
 		{
 			name:     "with cwd",
 			payload:  NotifyPayload{Cwd: "~/code"},
-			contains: "CWD: ~/code",
+			contains: "DIR: ~/code",
 		},
 		{
 			name:     "with message",
@@ -391,6 +391,10 @@ func TestFormatMessage_MultipleFields(t *testing.T) {
 	}
 
 	got := formatMessage(payload)
+	want := "DIR: /home/user | PROJECT: test-project | test message"
+	if got != want {
+		t.Fatalf("formatMessage() = %q, want %q", got, want)
+	}
 
 	if !bytes.Contains([]byte(got), []byte("test-project")) {
 		t.Error("should contain project")
@@ -403,6 +407,19 @@ func TestFormatMessage_MultipleFields(t *testing.T) {
 	}
 	if !bytes.Contains([]byte(got), []byte(" | ")) {
 		t.Error("parts should be joined with ' | '")
+	}
+}
+
+func TestFormatMessage_TreatsPathProjectAsDirectoryWhenCwdMissing(t *testing.T) {
+	payload := NotifyPayload{
+		Project: "/Users/me/project",
+		Message: "done",
+	}
+
+	got := formatMessage(payload)
+	want := "DIR: /Users/me/project | done"
+	if got != want {
+		t.Fatalf("formatMessage() = %q, want %q", got, want)
 	}
 }
 
@@ -529,6 +546,15 @@ func TestSettingsHandler_GET(t *testing.T) {
 	body := w.Body.String()
 	if !bytes.Contains([]byte(body), []byte("AgentNotify 设置")) {
 		t.Error("expected HTML title in response")
+	}
+	if !bytes.Contains([]byte(body), []byte("START · claude")) {
+		t.Error("expected settings preview to show event and agent first")
+	}
+	if !bytes.Contains([]byte(body), []byte("DIR: ~/code")) {
+		t.Error("expected settings preview to show directory first")
+	}
+	if bytes.Contains([]byte(body), []byte("Agent Start: claude")) {
+		t.Error("settings preview should not use old title format")
 	}
 }
 
