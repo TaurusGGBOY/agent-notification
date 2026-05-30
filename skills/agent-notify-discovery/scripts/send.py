@@ -3,6 +3,7 @@
 
 import argparse
 import json
+import os
 import sys
 import urllib.error
 import urllib.request
@@ -14,18 +15,34 @@ def normalize_payload(source_json):
     except json.JSONDecodeError:
         data = {}
 
-    return {
-        "agent": data.get("agent", "claude"),
-        "event": data.get("event", "stop"),
-        "project": data.get("project", ""),
-        "cwd": data.get("cwd") or data.get("workdir", ""),
-        "message": data.get("message", ""),
-        "timestamp": data.get("timestamp", ""),
-        "sourcePayload": data,
-    }
+    payload = {"sourcePayload": data}
+    for field in ("agent", "event", "project", "message", "timestamp"):
+        value = data.get(field)
+        if value:
+            payload[field] = value
+    cwd = data.get("cwd") or data.get("workdir")
+    if cwd:
+        payload["cwd"] = cwd
+    return payload
 
 
-def send_notification(url, agent, event, project="", cwd="", message="", timestamp="", strict=False):
+def default_project_from_cwd(cwd):
+    if not cwd:
+        return ""
+    return os.path.basename(os.path.normpath(cwd))
+
+
+def send_notification(
+    url,
+    agent,
+    event,
+    project="",
+    cwd="",
+    message="",
+    timestamp="",
+    strict=False,
+    source_payload=None,
+):
     payload = {
         "agent": agent,
         "event": event,
@@ -33,7 +50,7 @@ def send_notification(url, agent, event, project="", cwd="", message="", timesta
         "cwd": cwd,
         "message": message,
         "timestamp": timestamp,
-        "sourcePayload": {},
+        "sourcePayload": source_payload or {},
     }
 
     notify_url = url.rstrip("/") + "/notify"
@@ -85,16 +102,22 @@ def main():
         args.cwd = payload.get("cwd") or args.cwd
         args.message = payload.get("message") or args.message
         args.timestamp = payload.get("timestamp") or args.timestamp
+    else:
+        payload = {"sourcePayload": {}}
+
+    if not args.project:
+        args.project = default_project_from_cwd(args.cwd)
 
     return send_notification(
-        args.url,
-        args.agent,
-        args.event,
-        args.project,
-        args.cwd,
-        args.message,
-        args.timestamp,
-        args.strict,
+        url=args.url,
+        agent=args.agent,
+        event=args.event,
+        project=args.project,
+        cwd=args.cwd,
+        message=args.message,
+        timestamp=args.timestamp,
+        strict=args.strict,
+        source_payload=payload.get("sourcePayload", {}),
     )
 
 

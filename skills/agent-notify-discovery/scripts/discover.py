@@ -1,74 +1,152 @@
 #!/usr/bin/env python3
-"""Discovery for Agent Notify Server.
-
-Supports multiple discovery methods:
-1. UDP broadcast (default)
-2. Direct HTTP check via --host
-3. Subnet scan via --subnet
-4. Manual URL via --manual
-"""
+"""Discovery for Agent Notify Server."""
 
 import socket
 import sys
 import json
 import time
 import argparse
-import requests
+import urllib.error
+import urllib.request
 
-UDP_PORT = 17892
-UDP_MSG = b"AGENT_NOTIFY_DISCOVER v1"
-UDP_TIMEOUT = 2
+HTTP_PORT = 17891
 HTTP_TIMEOUT = 3
+SERVICE_TYPE = "_agent-notify._tcp.local."
 
 
-def discover_udp():
-    """UDP broadcast discovery."""
-    servers = []
-    sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
-    sock.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
-    sock.settimeout(UDP_TIMEOUT)
+def fetch_manifest(url, timeout=HTTP_TIMEOUT):
+    """Fetch server manifest and ensure it contains a URL."""
+    manifest_url = url.rstrip("/") + "/manifest"
+    req = urllib.request.Request(manifest_url, headers={"Accept": "application/json"})
+    with urllib.request.urlopen(req, timeout=timeout) as resp:
+        payload = json.loads(resp.read().decode("utf-8"))
+    payload.setdefault("url", url.rstrip("/"))
+    return payload
 
+
+def load_zeroconf():
+    """Import zeroconf lazily so manual URL mode works without it."""
     try:
-        sock.sendto(UDP_MSG, ("255.255.255.255", UDP_PORT))
-    except PermissionError:
-        print("UDP broadcast permission denied, skipping UDP discovery", file=sys.stderr)
-        sock.close()
-        return servers
-    except Exception as e:
-        print(f"UDP broadcast failed: {e}", file=sys.stderr)
-        sock.close()
-        return servers
+        from zeroconf import ServiceBrowser, ServiceListener, Zeroconf
+    except ImportError as err:
+        raise RuntimeError("zeroconf is required for mDNS discovery; run install-skill.sh") from err
+    return ServiceBrowser, ServiceListener, Zeroconf
 
-    end_time = time.time() + UDP_TIMEOUT
-    while time.time() < end_time:
+
+def service_addresses(info):
+    """Return parsed service addresses, preferring APIs across zeroconf versions."""
+    if hasattr(info, "parsed_addresses"):
         try:
-            data, addr = sock.recvfrom(4096)
-            try:
-                server = json.loads(data.decode("utf-8"))
-                servers.append(server)
-            except json.JSONDecodeError:
-                pass
-        except socket.timeout:
-            break
+            parsed = list(info.parsed_addresses())
+            if parsed:
+                return parsed
+        except TypeError:
+            pass
 
-    sock.close()
+    addresses = []
+    for raw in getattr(info, "addresses", []):
+        if isinstance(raw, str):
+            addresses.append(raw)
+            continue
+        try:
+            if len(raw) == 4:
+                addresses.append(socket.inet_ntoa(raw))
+            elif len(raw) == 16:
+                addresses.append(socket.inet_ntop(socket.AF_INET6, raw))
+        except OSError:
+            continue
+    return addresses
+
+
+def choose_address(addresses):
+    """Choose first non-loopback IPv4 address, then any non-loopback address."""
+    non_loopback = [address for address in addresses if not address.startswith(("127.", "::1"))]
+    for address in non_loopback:
+        if "." in address:
+            return address
+    return non_loopback[0] if non_loopback else (addresses[0] if addresses else "")
+
+
+def url_from_service_info(info):
+    """Build HTTP URL from zeroconf service info."""
+    host = choose_address(service_addresses(info))
+    if not host:
+        return None
+    if ":" in host and not host.startswith("["):
+        host = f"[{host}]"
+    return f"http://{host}:{getattr(info, 'port', 0) or HTTP_PORT}"
+
+
+class AgentNotifyListener:
+    def __init__(self):
+        self.urls = {}
+
+    def add_service(self, zeroconf, service_type, name):
+        self._record(zeroconf, service_type, name)
+
+    def update_service(self, zeroconf, service_type, name):
+        self._record(zeroconf, service_type, name)
+
+    def remove_service(self, zeroconf, service_type, name):
+        self.urls.pop(name, None)
+
+    def _record(self, zeroconf, service_type, name):
+        info = zeroconf.get_service_info(service_type, name, timeout=1500)
+        if not info:
+            return
+        url = url_from_service_info(info)
+        if url:
+            self.urls[name] = url
+
+
+def discover_mdns(timeout=3.0):
+    """Discover servers through mDNS/DNS-SD."""
+    servers = []
+    try:
+        ServiceBrowser, _ServiceListener, Zeroconf = load_zeroconf()
+        zeroconf = Zeroconf()
+    except Exception as err:
+        print(f"mDNS discovery unavailable: {err}", file=sys.stderr)
+        return servers
+
+    listener = AgentNotifyListener()
+    try:
+        ServiceBrowser(zeroconf, SERVICE_TYPE, listener)
+        time.sleep(timeout)
+        urls = list(dict.fromkeys(listener.urls.values()))
+    finally:
+        zeroconf.close()
+
+    for url in urls:
+        try:
+            servers.append(fetch_manifest(url))
+        except (OSError, urllib.error.URLError, json.JSONDecodeError) as err:
+            print(f"mDNS candidate did not answer at {url}: {err}", file=sys.stderr)
     return servers
+
+
+def normalize_manual_url(value):
+    if value.startswith("http://") or value.startswith("https://"):
+        return value.rstrip("/")
+    return f"http://{value}:{HTTP_PORT}"
 
 
 def check_http(url):
     """Check if server responds at URL's /manifest endpoint."""
     try:
-        resp = requests.get(f"{url}/manifest", timeout=HTTP_TIMEOUT)
-        if resp.status_code == 200:
-            return resp.json()
+        return fetch_manifest(url)
     except Exception:
-        pass
-    return None
+        return None
+
+
+def discover_manual(value):
+    manifest = check_http(normalize_manual_url(value))
+    return [manifest] if manifest else []
 
 
 def discover_host(host):
     """Direct HTTP check for single host."""
-    url = f"http://{host}:17891"
+    url = f"http://{host}:{HTTP_PORT}"
     manifest = check_http(url)
     if manifest:
         return [manifest]
@@ -80,6 +158,7 @@ def discover_subnet(subnet):
     """Scan subnet for servers. subnet format: 192.168.31.0/24"""
     try:
         import ipaddress
+
         network = ipaddress.ip_network(subnet, strict=False)
     except ValueError:
         print(f"Invalid subnet: {subnet}", file=sys.stderr)
@@ -89,7 +168,7 @@ def discover_subnet(subnet):
     print(f"Scanning {network.num_addresses} hosts on {subnet}...", file=sys.stderr)
 
     for ip in network.hosts():
-        manifest = check_http(f"http://{ip}:17891")
+        manifest = check_http(f"http://{ip}:{HTTP_PORT}")
         if manifest:
             servers.append(manifest)
             print(f"  Found: {ip}", file=sys.stderr)
@@ -97,43 +176,33 @@ def discover_subnet(subnet):
     return servers
 
 
-def main():
+def discover(args):
+    if args.host:
+        return discover_host(args.host)
+    if args.subnet:
+        return discover_subnet(args.subnet)
+    if args.manual:
+        return discover_manual(args.manual)
+    return discover_mdns(timeout=args.timeout)
+
+
+def main(argv=None):
     parser = argparse.ArgumentParser(description="Discover Agent Notify Servers")
     parser.add_argument("--json", action="store_true", help="Output JSON")
     parser.add_argument("--host", metavar="IP", help="Check single host directly")
     parser.add_argument("--subnet", metavar="NETWORK", help="Scan subnet (e.g. 192.168.31.0/24)")
     parser.add_argument("--manual", metavar="URL", help="Use manual URL directly")
+    parser.add_argument("--timeout", type=float, default=3.0, help="mDNS browse timeout in seconds")
 
-    args = parser.parse_args()
-
-    # Direct host check
-    if args.host:
-        servers = discover_host(args.host)
-    elif args.subnet:
-        servers = discover_subnet(args.subnet)
-    elif args.manual:
-        manifest = check_http(args.manual)
-        servers = [manifest] if manifest else []
-    else:
-        # UDP discovery with HTTP fallback
-        servers = discover_udp()
-
-        # Fallback: scan local /24 subnet
-        if not servers:
-            print("UDP discovery found nothing, falling back to subnet scan...", file=sys.stderr)
-            try:
-                local_ip = [(s.connect(("8.8.8.8", 80)), s.getsockname()[0], s.close()) for s in [socket.socket(socket.AF_INET, socket.SOCK_STREAM)]][0][1]
-                localSubnet = local_ip.rsplit(".", 1)[0] + ".0/24"
-                servers = discover_subnet(localSubnet)
-            except Exception as e:
-                print(f"Subnet scan failed: {e}", file=sys.stderr)
+    args = parser.parse_args(argv)
+    servers = discover(args)
 
     if args.json:
         print(json.dumps(servers))
     elif servers:
         print(f"Found {len(servers)} server(s):")
-        for s in servers:
-            print(f"  - {s.get('name', 'unknown')} at {s.get('url', 'unknown')}")
+        for server in servers:
+            print(f"  - {server.get('name', 'unknown')} at {server.get('url', 'unknown')}")
     else:
         print("No servers found.")
         sys.exit(1)

@@ -1,24 +1,105 @@
 # Hook Formats Reference
 
-This documents the hook configurations for different agents.
+This documents hook configurations for supported agents.
 
 ## Claude Code
 
-Claude Code uses `SessionStart` and `Stop` hooks.
+Claude Code stores user hooks in `~/.claude/settings.json`. Project hooks use `.claude/settings.json`.
 
 ```json
 {
   "hooks": {
-    "SessionStart": "python scripts/send.py --url http://IP:17891 --agent claude --event start",
-    "Stop": "python scripts/send.py --url http://IP:17891 --agent claude --event stop"
+    "SessionStart": [
+      {
+        "matcher": "",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "python3 /path/to/scripts/send.py --url http://IP:17891 --agent claude --event start --project \"${CLAUDE_PROJECT_DIR:-unknown}\""
+          }
+        ]
+      }
+    ],
+    "Stop": [
+      {
+        "matcher": "",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "python3 /path/to/scripts/send.py --url http://IP:17891 --agent claude --event stop --project \"${CLAUDE_PROJECT_DIR:-unknown}\""
+          }
+        ]
+      }
+    ]
   }
 }
 ```
 
-Hook input format (JSON on stdin):
+Use script:
+
+```bash
+python scripts/configure_claude.py \
+  --url http://IP:17891 \
+  --agent claude \
+  --events start stop \
+  --scope user
+```
+
+## Codex
+
+Codex stores user hooks in `~/.codex/hooks.json`. It may prompt to trust hooks after config changes; review the file before approving.
+
 ```json
 {
-  "agent": "claude",
+  "hooks": {
+    "SessionStart": [
+      {
+        "matcher": "startup|resume",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "python3 /path/to/scripts/send.py --url http://IP:17891 --agent codex --event start --project \"$(basename \"$PWD\")\" --cwd \"$PWD\" --message 'Codex task started' >/dev/null 2>&1 || true",
+            "timeout": 30,
+            "statusMessage": "Sending Codex start notice"
+          }
+        ]
+      }
+    ],
+    "Stop": [
+      {
+        "matcher": "",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "python3 /path/to/scripts/send.py --url http://IP:17891 --agent codex --event stop --project \"$(basename \"$PWD\")\" --cwd \"$PWD\" --message 'Codex task complete' >/dev/null 2>&1 || true",
+            "timeout": 30,
+            "statusMessage": "Sending Codex stop notice"
+          }
+        ]
+      }
+    ]
+  }
+}
+```
+
+Use script:
+
+```bash
+python scripts/configure_codex.py \
+  --url http://IP:17891 \
+  --agent codex \
+  --events start stop
+```
+
+`configure_codex.py` preserves unrelated hook commands and replaces only prior Agent Notify Codex hooks.
+
+## Hook Payload
+
+Hook input is JSON on stdin when the agent provides it. `send.py` uses explicit CLI args as defaults and lets stdin override only fields present in the payload.
+
+```json
+{
+  "agent": "claude|codex",
   "event": "stop",
   "project": "agent-notification",
   "cwd": "/path/to/project",
@@ -27,10 +108,6 @@ Hook input format (JSON on stdin):
   "sourcePayload": {}
 }
 ```
-
-## Codex (Future)
-
-Codex uses hooks in `~/.codex/hooks.json`.
 
 ## OpenClaw (Future)
 

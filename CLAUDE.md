@@ -9,7 +9,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 cd windows-server
 make build          # → agent-notify-server.exe (amd64)
 make build-arm      # → agent-notify-server-arm64.exe (ARM64)
-make test           # 46 tests
+make test           # Go tests
 make run            # local run (non-Windows: toast stub)
 
 # Install skill
@@ -23,22 +23,24 @@ make run            # local run (non-Windows: toast stub)
 
 ```
 windows-server/          Go HTTP server (Windows toast notifications)
-  main.go                Entry: HTTP :17891 + UDP discovery :17892
-  handlers.go            /health, /manifest, /notify endpoints
+  main.go                Entry: HTTP :17891 + mDNS broadcast
+  handlers.go            /health, /manifest, /notify, /history endpoints
   settings.go            GET/POST /settings, GET /config
   config.go             %APPDATA%\AgentNotify\config.json
-  udp.go                UDP broadcast listener
+  mdns.go               mDNS/DNS-SD advertisement
   toast.go              Cross-platform stub
   toast_windows.go      Windows toast via PowerShell WinRT bridge
-  windows_test.go       34 unit tests
+  windows_test.go       Unit tests
   Makefile              cross-compile via GOOS=windows GOARCH=amd64
 
-skills/agent-notify-discovery/    Claude Code skill (separate repo)
-  scripts/discover.py   UDP broadcast discovery
-  scripts/send.py      POST /notify, stdin JSON, exit 0 on fail
-  scripts/configure_claude.py  Hook setup, idempotent
+skills/agent-notify-discovery/
+  scripts/discover.py          mDNS/DNS-SD discovery
+  scripts/send.py              POST /notify, stdin JSON, exit 0 on fail
+  scripts/configure_claude.py  Claude hook setup, idempotent
+  scripts/configure_codex.py   Codex hook setup, idempotent
+  scripts/setup.py             One-command Claude/Codex setup
 
-scripts/install-skill.sh    Symlink skill → ~/.claude/skills/
+scripts/install-skill.sh    Copy skill + zeroconf venv → ~/.claude/skills/
 ```
 
 ## Remote Windows Deployment
@@ -63,10 +65,11 @@ ssh Administrator@192.168.31.167 "cd C:/Users/Administrator && start /B agent-no
 - `GET /health` → `{status, version}`
 - `GET /manifest` → `{name, version, url, supportedEvents, supportedStyles}`
 - `POST /notify` → payload, returns 204 or 400
+- `GET /history` → latest notification records
 - `GET /settings` → HTML settings UI
 - `GET /config` → current config JSON
 - `POST /settings` → save config
 
-**UDP discovery** (`17892`):
-- Listen for `AGENT_NOTIFY_DISCOVER v1`
-- Response JSON: `{url, hostname, supportedEvents, supportedStyles}`
+**mDNS discovery**:
+- Advertises `_agent-notify._tcp.local.`
+- TXT includes `{version, events, styles, path, settings}`

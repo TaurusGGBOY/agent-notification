@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Configure Claude Code SessionStart/Stop hooks for agent notifications."""
+"""Configure Codex SessionStart/Stop hooks for agent notifications."""
 
 import argparse
 import json
@@ -11,10 +11,10 @@ import urllib.request
 SCRIPT_DIR = os.path.dirname(os.path.abspath(__file__))
 
 
-def settings_path(scope):
-    if scope == "project":
-        return os.path.join(os.getcwd(), ".claude", "settings.json")
-    return os.path.join(os.path.expanduser("~"), ".claude", "settings.json")
+def hooks_path(path=None):
+    if path:
+        return os.path.abspath(os.path.expanduser(path))
+    return os.path.join(os.path.expanduser("~"), ".codex", "hooks.json")
 
 
 def load_settings(path):
@@ -39,77 +39,89 @@ def fetch_manifest(url):
 
 def command_for(server_url, agent, event):
     send_script = os.path.join(SCRIPT_DIR, "send.py")
+    message = "Codex task started" if event == "start" else "Codex task complete"
     return (
         f"python3 {shlex.quote(send_script)} "
         f"--url {shlex.quote(server_url)} "
         f"--agent {shlex.quote(agent)} "
         f"--event {event} "
-        '--project "${CLAUDE_PROJECT_DIR:-unknown}" '
-        '--cwd "${CLAUDE_PROJECT_DIR:-$PWD}"'
+        '--project "$(basename "$PWD")" '
+        '--cwd "$PWD" '
+        f"--message {shlex.quote(message)} "
+        ">/dev/null 2>&1 || true"
     )
 
 
-def hook_entry(command):
+def hook_entry(server_url, agent, event):
     return {
-        "matcher": "",
-        "hooks": [
-            {
-                "type": "command",
-                "command": command,
-            }
-        ],
+        "type": "command",
+        "command": command_for(server_url, agent, event),
+        "timeout": 30,
+        "statusMessage": f"Sending Codex {event} notice",
     }
 
 
-def is_agent_notify_hook(hook, event, agent):
+def is_agent_notify_hook(hook, event):
+    status = hook.get("statusMessage", "")
     command = hook.get("command", "")
-    return "send.py" in command and f"--agent {agent}" in command and f"--event {event}" in command
+    if status == f"Sending Codex {event} notice":
+        return True
+    return "send.py" in command and "--agent codex" in command and f"--event {event}" in command
 
 
-def upsert_event_hook(hooks, event_name, hook, normalized_event, agent):
+def upsert_event_hook(hooks, event_name, matcher, hook, normalized_event):
     entries = hooks.setdefault(event_name, [])
     for entry in entries:
         existing_hooks = entry.get("hooks", [])
         entry["hooks"] = [
-            existing for existing in existing_hooks if not is_agent_notify_hook(existing, normalized_event, agent)
+            existing for existing in existing_hooks if not is_agent_notify_hook(existing, normalized_event)
         ]
 
     entries[:] = [entry for entry in entries if entry.get("hooks")]
 
     target = None
     for entry in entries:
-        if entry.get("matcher", "") == "":
+        if entry.get("matcher", "") == matcher:
             target = entry
             break
 
     if target is None:
-        target = {"matcher": "", "hooks": []}
+        target = {"matcher": matcher, "hooks": []}
         entries.append(target)
 
-    target.setdefault("hooks", []).append(hook["hooks"][0])
+    target.setdefault("hooks", []).append(hook)
 
 
 def configure_hooks(settings, server_url, agent, events):
     hooks = settings.setdefault("hooks", {})
 
     if "start" in events:
-        start_cmd = command_for(server_url, agent, "start")
-        upsert_event_hook(hooks, "SessionStart", hook_entry(start_cmd), "start", agent)
+        upsert_event_hook(
+            hooks,
+            "SessionStart",
+            "startup|resume",
+            hook_entry(server_url, agent, "start"),
+            "start",
+        )
 
     if "stop" in events:
-        stop_cmd = command_for(server_url, agent, "stop")
-        upsert_event_hook(hooks, "Stop", hook_entry(stop_cmd), "stop", agent)
-        
+        upsert_event_hook(
+            hooks,
+            "Stop",
+            "",
+            hook_entry(server_url, agent, "stop"),
+            "stop",
+        )
 
     return settings
 
 
 def main():
-    parser = argparse.ArgumentParser(description="Configure Claude Code hooks")
+    parser = argparse.ArgumentParser(description="Configure Codex hooks")
     parser.add_argument("--url", required=True, help="Agent Notify server URL")
-    parser.add_argument("--agent", default="claude", help="Agent name")
+    parser.add_argument("--agent", default="codex", help="Agent name")
     parser.add_argument("--events", nargs="+", default=["start", "stop"], choices=["start", "stop"])
-    parser.add_argument("--scope", choices=["user", "project"], default="user")
+    parser.add_argument("--path", help="hooks.json path; default is ~/.codex/hooks.json")
     parser.add_argument("--dry-run", action="store_true")
     parser.add_argument("--test", action="store_true", help="Send a stop test notification after saving")
     args = parser.parse_args()
@@ -120,7 +132,7 @@ def main():
     except Exception as err:
         print(f"Warning: cannot reach {args.url}: {err}", file=sys.stderr)
 
-    path = settings_path(args.scope)
+    path = hooks_path(args.path)
     settings = load_settings(path)
     configure_hooks(settings, args.url, args.agent, args.events)
 
@@ -131,7 +143,7 @@ def main():
 
     save_settings(path, settings)
     print(f"Hooks configured in {path}")
-    print("Restart Claude Code for changes to take effect.")
+    print("Restart Codex for changes to take effect. If Codex asks to trust hooks, approve only after reviewing this file.")
 
     if args.test:
         import subprocess

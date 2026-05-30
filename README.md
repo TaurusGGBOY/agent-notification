@@ -12,12 +12,13 @@ LAN-only notification receiver. Mac/Unix agents send `start`/`stop` events to a 
 
 **Windows server** (`windows-server/`)
 - HTTP API on `0.0.0.0:17891`
-- UDP discovery on port `17892`
+- mDNS/DNS-SD discovery as `_agent-notify._tcp.local.`
 - Toast notifications with style presets
 - Settings UI at `http://<windows-ip>:17891/settings`
 
 **Skill** (`skills/agent-notify-discovery/`)
-- Installs to `~/.claude/skills/`
+- Configures Claude Code hooks in `~/.claude/settings.json`
+- Configures Codex hooks in `~/.codex/hooks.json`
 - Run `/agent-notify-discovery` or use scripts directly
 
 ## Quick Start
@@ -32,7 +33,23 @@ Windows users should install and start the Tauri app from the release package. T
 ./scripts/install-skill.sh [--test]
 ```
 
-### 3. Configure Claude Code hooks
+### 3. Configure agent hooks
+
+One-command setup for Claude Code and Codex:
+
+```bash
+python skills/agent-notify-discovery/scripts/setup.py \
+  --url http://<windows-ip>:17891 \
+  --agents claude codex \
+  --events start stop \
+  --test
+```
+
+Omit `--url` to try mDNS discovery first.
+
+Individual commands:
+
+Claude Code:
 
 ```bash
 python skills/agent-notify-discovery/scripts/configure_claude.py \
@@ -40,6 +57,15 @@ python skills/agent-notify-discovery/scripts/configure_claude.py \
   --agent claude \
   --events start stop \
   --scope user
+```
+
+Codex:
+
+```bash
+python skills/agent-notify-discovery/scripts/configure_codex.py \
+  --url http://<windows-ip>:17891 \
+  --agent codex \
+  --events start stop
 ```
 
 ## Windows One-Click App

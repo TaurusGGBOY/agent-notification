@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
-# Install agent-notify-discovery skill to ~/.claude/skills/
+# Install agent-notify-discovery skill to ~/.claude/skills/.
 
-set -e
+set -euo pipefail
 
 REPO_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 SKILL_SOURCE="$REPO_ROOT/skills/agent-notify-discovery"
@@ -17,16 +17,16 @@ echo "Installing agent-notify-discovery skill..."
 # Create ~/.claude/skills/ if not exists
 mkdir -p "$HOME/.claude/skills"
 
-# Remove existing if present
 rm -rf "$SKILL_TARGET"
-
-# Symlink (comment out below line and uncomment copy if you prefer copy)
-ln -s "$SKILL_SOURCE" "$SKILL_TARGET"
+cp -R "$SKILL_SOURCE" "$SKILL_TARGET"
+python3 -m venv "$SKILL_TARGET/.venv"
+"$SKILL_TARGET/.venv/bin/python" -m pip install --upgrade pip
+"$SKILL_TARGET/.venv/bin/python" -m pip install zeroconf
 
 echo "✓ Skill installed at $SKILL_TARGET"
 
 # Optionally run discovery test
-if [ "$1" == "--test" ]; then
+if [ "${1:-}" == "--test" ]; then
     echo "Running discovery test..."
-    python3 "$SKILL_TARGET/scripts/discover.py" --json
+    "$SKILL_TARGET/.venv/bin/python" "$SKILL_TARGET/scripts/discover.py" --json
 fi
