@@ -18,7 +18,7 @@ def normalize_payload(source_json):
         "agent": data.get("agent", "claude"),
         "event": data.get("event", "stop"),
         "project": data.get("project", ""),
-        "cwd": data.get("cwd", ""),
+        "cwd": data.get("cwd") or data.get("workdir", ""),
         "message": data.get("message", ""),
         "timestamp": data.get("timestamp", ""),
         "sourcePayload": data,

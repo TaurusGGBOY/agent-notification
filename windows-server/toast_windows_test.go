@@ -67,6 +67,9 @@ func TestWindowsToastNotifierNotifyWithStyleSendsFormattedXML(t *testing.T) {
 	if !strings.Contains(*xml, `placement="attribution">Agent C`) {
 		t.Fatalf("agent badge XML missing attribution: %s", *xml)
 	}
+	if !strings.Contains(*xml, "<text>message</text>") {
+		t.Fatalf("agent badge XML missing message details: %s", *xml)
+	}
 }
 
 func TestWindowsToastNotifierCustomCardRendersImage(t *testing.T) {

@@ -5,56 +5,56 @@ import (
 	"strings"
 )
 
-func formatToastXML(style, event, title, agent, project, cardImagePath string) string {
+func formatToastXML(style, event, title, agent, details, cardImagePath string) string {
 	switch style {
 	case "status-color":
-		return buildStatusColorXML(event, title, project)
+		return buildStatusColorXML(event, title, details)
 	case "agent-badge":
-		return buildAgentBadgeXML(event, title, agent, project)
+		return buildAgentBadgeXML(event, title, agent, details)
 	case "compact":
-		return buildCompactXML(title)
+		return buildCompactXML(title, details)
 	case "custom-card":
-		return buildCustomCardXML(title, project, cardImagePath)
+		return buildCustomCardXML(title, details, cardImagePath)
 	default:
-		return buildCleanXML(title, project)
+		return buildCleanXML(title, details)
 	}
 }
 
-func buildCleanXML(title, project string) string {
-	return buildToastXML(title, project, "", "", "", "")
+func buildCleanXML(title, details string) string {
+	return buildToastXML(title, details, "", "", "", "")
 }
 
-func buildStatusColorXML(event, title, project string) string {
+func buildStatusColorXML(event, title, details string) string {
 	status := "Stopped"
 	if event == "start" {
 		status = "Started"
 	}
-	return buildToastXML(title, project, "", "", "", status)
+	return buildToastXML(title, details, "", "", "", status)
 }
 
-func buildAgentBadgeXML(event, title, agent, project string) string {
+func buildAgentBadgeXML(event, title, agent, details string) string {
 	_ = event
 	initial := agentInitial(agent)
-	return buildToastXML(title, project, "", "", "", "Agent "+initial)
+	return buildToastXML(title, details, "", "", "", "Agent "+initial)
 }
 
-func buildCompactXML(title string) string {
-	return `<toast><visual><binding template="ToastGeneric"><text>` + escapeXML(title) + `</text></binding></visual></toast>`
+func buildCompactXML(title, details string) string {
+	return buildToastXML(title, details, "", "", "", "")
 }
 
-func buildCustomCardXML(title, project, cardImagePath string) string {
-	return buildToastXML(title, project, cardImagePath, "hero", "", "")
+func buildCustomCardXML(title, details, cardImagePath string) string {
+	return buildToastXML(title, details, cardImagePath, "hero", "", "")
 }
 
-func buildToastXML(title, project, imagePath, placement, crop, attribution string) string {
+func buildToastXML(title, details, imagePath, placement, crop, attribution string) string {
 	var sb strings.Builder
 	sb.WriteString(`<toast><visual><binding template="ToastGeneric">`)
 	sb.WriteString(`<text>`)
 	sb.WriteString(escapeXML(title))
 	sb.WriteString(`</text>`)
-	if project != "" {
+	if details != "" {
 		sb.WriteString(`<text>`)
-		sb.WriteString(escapeXML(project))
+		sb.WriteString(escapeXML(details))
 		sb.WriteString(`</text>`)
 	}
 	if attribution != "" {

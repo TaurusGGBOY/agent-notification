@@ -28,7 +28,6 @@ func (n *ToastNotifier) Notify(title, message string) error {
 }
 
 func (n *ToastNotifier) NotifyWithStyle(style, event, title, message, agent string) error {
-	project := ""
 	cardPath := ""
 	if style == "custom-card" {
 		log.Printf("custom-card style detected, generating toast card")
@@ -42,7 +41,6 @@ func (n *ToastNotifier) NotifyWithStyle(style, event, title, message, agent stri
 			Event:   event,
 			Title:   title,
 			Agent:   agent,
-			Project: project,
 			Message: message,
 		}
 		if err := renderToastCardFn(path, card); err != nil {
@@ -52,7 +50,7 @@ func (n *ToastNotifier) NotifyWithStyle(style, event, title, message, agent stri
 		log.Printf("card rendered successfully")
 		cardPath = path
 	}
-	xml := formatToastXML(style, event, title, agent, project, cardPath)
+	xml := formatToastXML(style, event, title, agent, message, cardPath)
 	log.Printf("sending toast via PowerShell, XML length: %d", len(xml))
 	if err := sendToastPowerShell(n.appName, xml); err != nil {
 		log.Printf("Toast notification failed: %v", err)
