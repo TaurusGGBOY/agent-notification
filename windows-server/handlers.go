@@ -287,7 +287,7 @@ func formatMessage(payload NotifyPayload) string {
 		project = ""
 	}
 	if workdir != "" {
-		parts = append(parts, "DIR: "+workdir)
+		parts = append(parts, "DIR: "+compactDirectoryForDisplay(workdir, 46))
 	}
 
 	if project != "" && project != workdir && !strings.EqualFold(project, "unknown") {

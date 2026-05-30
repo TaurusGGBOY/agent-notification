@@ -423,6 +423,18 @@ func TestFormatMessage_TreatsPathProjectAsDirectoryWhenCwdMissing(t *testing.T) 
 	}
 }
 
+func TestFormatMessage_CompactsDeepDirectoryButKeepsTail(t *testing.T) {
+	payload := NotifyPayload{
+		Cwd:     "/Users/me/work/company/platform/services/agent-notification/tauri-app/src",
+		Message: "done",
+	}
+
+	got := formatMessage(payload)
+	if !strings.Contains(got, "DIR: /Users/me/.../agent-notification/tauri-app/src") {
+		t.Fatalf("formatMessage() = %q, want compact directory with tail", got)
+	}
+}
+
 // === Discovery Response Formatting Tests ===
 
 func TestHealthHandler(t *testing.T) {
