@@ -1,7 +1,8 @@
 #![cfg_attr(not(debug_assertions), windows_subsystem = "windows")]
 
-mod service;
+mod lifecycle;
 mod notification_settings;
+mod service;
 mod tray;
 
 use tauri::{Manager, Theme};
@@ -26,7 +27,9 @@ fn set_app_theme(app: tauri::AppHandle, theme: String) -> Result<(), String> {
 fn main() {
     tauri::Builder::default()
         .plugin(tauri_plugin_shell::init())
+        .enable_macos_default_menu(false)
         .manage(service::ServiceState::new())
+        .manage(lifecycle::TrayExitState::default())
         .invoke_handler(tauri::generate_handler![
             notification_settings::open_windows_notification_settings,
             notification_settings::windows_notification_status,
@@ -35,6 +38,8 @@ fn main() {
             set_app_theme
         ])
         .setup(|app| {
+            #[cfg(target_os = "macos")]
+            app.set_activation_policy(tauri::ActivationPolicy::Accessory);
             service::ensure_sidecar(app.handle())?;
             tray::build_tray(app.handle())?;
             if let Some(window) = app.get_webview_window("main") {
@@ -57,7 +62,14 @@ fn main() {
         .build(tauri::generate_context!())
         .expect("error while building AgentNotify")
         .run(|app, event| {
-            if let tauri::RunEvent::ExitRequested { .. } = event {
+            if let tauri::RunEvent::ExitRequested { api, .. } = event {
+                let tray_exit = app.state::<lifecycle::TrayExitState>();
+                if !tray_exit.consume_tray_exit_request() {
+                    api.prevent_exit();
+                    lifecycle::hide_main_window(app);
+                    return;
+                }
+
                 let state = app.state::<service::ServiceState>();
                 service::stop_sidecar(&state);
             }

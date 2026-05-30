@@ -5,7 +5,7 @@ use tauri::menu::{Menu, MenuItem, PredefinedMenuItem};
 use tauri::tray::{MouseButton, MouseButtonState, TrayIconBuilder, TrayIconEvent};
 use tauri::{AppHandle, Emitter, Manager};
 
-use crate::service;
+use crate::{lifecycle, service};
 
 pub fn build_tray(app: &AppHandle) -> tauri::Result<()> {
     let open = MenuItem::with_id(app, "open", "打开 AgentNotify", true, None::<&str>)?;
@@ -22,6 +22,12 @@ pub fn build_tray(app: &AppHandle) -> tauri::Result<()> {
     )?;
 
     TrayIconBuilder::with_id("agentnotify")
+        .icon(
+            app.default_window_icon()
+                .cloned()
+                .expect("missing default window icon"),
+        )
+        .icon_as_template(cfg!(target_os = "macos"))
         .tooltip("AgentNotify")
         .menu(&menu)
         .show_menu_on_left_click(false)
@@ -63,7 +69,10 @@ pub fn build_tray(app: &AppHandle) -> tauri::Result<()> {
                 service::stop_sidecar(&state);
                 let _ = service::ensure_sidecar(app);
             }
-            "quit" => app.exit(0),
+            "quit" => {
+                lifecycle::request_tray_exit(app);
+                app.exit(0);
+            }
             _ => {}
         })
         .build(app)?;
