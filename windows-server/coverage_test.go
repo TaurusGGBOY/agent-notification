@@ -112,6 +112,20 @@ func TestToastCardSummaryLinesPrioritizeEventAgentAndDirectory(t *testing.T) {
 	}
 }
 
+func TestCompactDirectoryForDisplayPreservesTailForDeepPaths(t *testing.T) {
+	unixPath := "/Users/me/work/company/platform/services/agent-notification/tauri-app/src"
+	got := compactDirectoryForDisplay(unixPath, 46)
+	if got != "/Users/me/.../agent-notification/tauri-app/src" {
+		t.Fatalf("unix compact path = %q", got)
+	}
+
+	windowsPath := `C:\Users\me\work\company\platform\agent-notification\windows-server`
+	got = compactDirectoryForDisplay(windowsPath, 50)
+	if got != `C:\Users\me\...\agent-notification\windows-server` {
+		t.Fatalf("windows compact path = %q", got)
+	}
+}
+
 func TestDrawCircleOnlyPaintsInsideBounds(t *testing.T) {
 	img := image.NewRGBA(image.Rect(0, 0, 20, 20))
 	drawCircle(img, 0, 0, 5, image.Black)
