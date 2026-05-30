@@ -423,6 +423,19 @@ func TestFormatMessage_TreatsPathProjectAsDirectoryWhenCwdMissing(t *testing.T) 
 	}
 }
 
+func TestFormatMessage_DoesNotTreatRepoSlugProjectAsDirectory(t *testing.T) {
+	payload := NotifyPayload{
+		Project: "TaurusGGBOY/agent-notification",
+		Message: "done",
+	}
+
+	got := formatMessage(payload)
+	want := "PROJECT: TaurusGGBOY/agent-notification | done"
+	if got != want {
+		t.Fatalf("formatMessage() = %q, want %q", got, want)
+	}
+}
+
 func TestFormatMessage_CompactsDeepDirectoryButKeepsTail(t *testing.T) {
 	payload := NotifyPayload{
 		Cwd:     "/Users/me/work/company/platform/services/agent-notification/tauri-app/src",
