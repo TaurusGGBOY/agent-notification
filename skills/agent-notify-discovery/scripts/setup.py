@@ -10,6 +10,7 @@ import configure_codex
 import send
 
 discover = None
+DISCOVERY_TIMEOUT = 8.0
 
 
 def load_discover():
@@ -21,9 +22,11 @@ def load_discover():
     return discover
 
 
-def discover_server_url():
+def discover_server_url(timeout=DISCOVERY_TIMEOUT):
     try:
-        servers = load_discover().discover_mdns()
+        discover_module = load_discover()
+        discover_module.reexec_with_venv_if_available()
+        servers = discover_module.discover_mdns(timeout=timeout)
     except Exception as err:
         print(f"Warning: discovery failed: {err}", file=sys.stderr)
         return None
@@ -46,7 +49,7 @@ def resolve_url(args):
     if args.url:
         return args.url.rstrip("/")
 
-    discovered = discover_server_url()
+    discovered = discover_server_url(getattr(args, "timeout", DISCOVERY_TIMEOUT))
     if discovered:
         print(f"Discovered Agent Notify server: {discovered}")
         return discovered
@@ -126,6 +129,7 @@ def build_parser():
     parser.add_argument("--dry-run", action="store_true", help="Print generated settings without writing files")
     parser.add_argument("--test", action="store_true", help="Send a strict test notification after saving hooks")
     parser.add_argument("--non-interactive", action="store_true", help="Do not prompt for URL if discovery fails")
+    parser.add_argument("--timeout", type=float, default=DISCOVERY_TIMEOUT, help="mDNS discovery timeout in seconds")
     return parser
 
 
