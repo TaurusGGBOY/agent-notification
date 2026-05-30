@@ -331,6 +331,16 @@ func looksLikePath(value string) bool {
 	}
 	return strings.HasPrefix(value, "/") ||
 		strings.HasPrefix(value, "~/") ||
-		strings.Contains(value, `\`) ||
-		strings.Contains(value, "/")
+		strings.HasPrefix(value, `~\`) ||
+		strings.HasPrefix(value, `\`) ||
+		hasWindowsDriveRoot(value)
+}
+
+func hasWindowsDriveRoot(value string) bool {
+	if len(value) < 3 || value[1] != ':' {
+		return false
+	}
+	drive := value[0]
+	return ((drive >= 'A' && drive <= 'Z') || (drive >= 'a' && drive <= 'z')) &&
+		(value[2] == '\\' || value[2] == '/')
 }

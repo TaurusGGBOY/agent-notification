@@ -97,7 +97,7 @@ func TestToastCardSummaryLinesPrioritizeEventAgentAndDirectory(t *testing.T) {
 		Event:   "stop",
 		Title:   "STOP · codex",
 		Agent:   "codex",
-		Message: "DIR: /Users/me/project | PROJECT: agent-notification | done",
+		Message: "DIR: /Users/me/project | PROJECT: agent-notification | DIR: done",
 	}
 
 	eventAgent, directory, detail := toastCardSummaryLines(card)
@@ -107,7 +107,7 @@ func TestToastCardSummaryLinesPrioritizeEventAgentAndDirectory(t *testing.T) {
 	if directory != "/Users/me/project" {
 		t.Fatalf("directory = %q, want /Users/me/project", directory)
 	}
-	if detail != "PROJECT: agent-notification | done" {
+	if detail != "PROJECT: agent-notification | DIR: done" {
 		t.Fatalf("detail = %q, want project detail", detail)
 	}
 }

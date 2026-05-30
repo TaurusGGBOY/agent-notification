@@ -174,7 +174,11 @@ func toastCardSummaryLines(card ToastCard) (string, string, string) {
 			continue
 		}
 		if strings.HasPrefix(part, "DIR:") {
-			directory = strings.TrimSpace(strings.TrimPrefix(part, "DIR:"))
+			if directory == "" {
+				directory = strings.TrimSpace(strings.TrimPrefix(part, "DIR:"))
+				continue
+			}
+			detailParts = append(detailParts, part)
 			continue
 		}
 		detailParts = append(detailParts, part)
