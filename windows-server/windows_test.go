@@ -16,18 +16,19 @@ type recordingNotifier struct {
 }
 
 type recordedNotification struct {
-	style string
-	event string
-	title string
+	style   string
+	event   string
+	title   string
+	message string
 }
 
 func (n *recordingNotifier) Notify(title, message string) error {
-	n.calls = append(n.calls, recordedNotification{title: title})
+	n.calls = append(n.calls, recordedNotification{title: title, message: message})
 	return nil
 }
 
 func (n *recordingNotifier) NotifyWithStyle(style, event, title, message, agent string) error {
-	n.calls = append(n.calls, recordedNotification{style: style, event: event, title: title})
+	n.calls = append(n.calls, recordedNotification{style: style, event: event, title: title, message: message})
 	return nil
 }
 
@@ -223,6 +224,28 @@ func TestNotifyHandler_ReloadsConfigForStyleChanges(t *testing.T) {
 	}
 	if notifier.calls[0].style != "agent-badge" {
 		t.Fatalf("style = %q, want agent-badge", notifier.calls[0].style)
+	}
+}
+
+func TestNotifyHandler_UsesWorkdirAliasInMessage(t *testing.T) {
+	cfg := DefaultConfig()
+	server := newTestServer(cfg)
+
+	body := `{"agent":"codex","event":"stop","workdir":"/Users/me/project"}`
+	req := httptest.NewRequest(http.MethodPost, "/notify", bytes.NewBufferString(body))
+	w := httptest.NewRecorder()
+
+	server.NotifyHandler(w, req)
+
+	if w.Code != http.StatusNoContent {
+		t.Fatalf("status = %d, want %d", w.Code, http.StatusNoContent)
+	}
+	notifier := server.notifier.(*recordingNotifier)
+	if len(notifier.calls) != 1 {
+		t.Fatalf("expected 1 notification, got %d", len(notifier.calls))
+	}
+	if !strings.Contains(notifier.calls[0].message, "/Users/me/project") {
+		t.Fatalf("message = %q, want workdir path", notifier.calls[0].message)
 	}
 }
 
@@ -865,12 +888,19 @@ func TestFormatToastXML_AgentBadge(t *testing.T) {
 }
 
 func TestFormatToastXML_Compact(t *testing.T) {
-	xml := formatToastXML("compact", "stop", "claude: stop", "claude", "agent-notification", "")
+	xml := formatToastXML("compact", "stop", "claude: stop", "claude", "", "")
 	if strings.Contains(xml, "agent-notification") {
 		t.Error("compact should not include project")
 	}
 	if strings.Contains(xml, `placement="hero"`) {
 		t.Error("compact should not use hero image")
+	}
+}
+
+func TestFormatToastXML_CompactIncludesDetails(t *testing.T) {
+	xml := formatToastXML("compact", "stop", "codex: stop", "codex", "CWD: /Users/me/project", "")
+	if !strings.Contains(xml, "<text>CWD: /Users/me/project</text>") {
+		t.Fatalf("compact XML missing workdir details: %s", xml)
 	}
 }
 

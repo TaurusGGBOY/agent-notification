@@ -66,6 +66,7 @@ type NotifyPayload struct {
 	Event         string                 `json:"event"`
 	Project       string                 `json:"project"`
 	Cwd           string                 `json:"cwd"`
+	Workdir       string                 `json:"workdir"`
 	Message       string                 `json:"message"`
 	Timestamp     string                 `json:"timestamp"`
 	SourcePayload map[string]interface{} `json:"sourcePayload"`
@@ -286,8 +287,12 @@ func formatMessage(payload NotifyPayload) string {
 		parts = append(parts, "Project: "+payload.Project)
 	}
 
-	if payload.Cwd != "" {
-		parts = append(parts, "CWD: "+payload.Cwd)
+	workdir := strings.TrimSpace(payload.Cwd)
+	if workdir == "" {
+		workdir = strings.TrimSpace(payload.Workdir)
+	}
+	if workdir != "" {
+		parts = append(parts, "CWD: "+workdir)
 	}
 
 	if payload.Message != "" {
