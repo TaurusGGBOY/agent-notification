@@ -530,6 +530,10 @@ button {
   background: var(--card-soft);
 }
 
+.toast-preview-copy {
+  min-width: 0;
+}
+
 .preview-clean {
   background: var(--card-soft);
 }
@@ -580,6 +584,7 @@ button {
   grid-template-columns: auto auto 1fr;
   align-items: center;
   min-height: 72px;
+  gap: 10px;
 }
 
 .preview-compact strong {
@@ -620,8 +625,25 @@ button {
   font-size: 14px;
 }
 
+.toast-preview .state-tag {
+  display: inline-flex;
+  width: max-content;
+  margin-top: 5px;
+  color: #fff;
+  font-size: 12px;
+  padding: 3px 8px;
+}
+
 .toast-preview p {
   margin-top: 8px;
+  overflow-wrap: anywhere;
+}
+
+.toast-preview small {
+  display: block;
+  margin-top: 6px;
+  color: var(--muted);
+  font-size: 12px;
 }
 
 .broadcast-row {

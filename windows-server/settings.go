@@ -99,12 +99,12 @@ h2{color:#fff;font-size:1.1rem;margin:1.5rem 0 .75rem}
 <h2>预览</h2>
 <div class="preview">
 <div class="toast-preview clean" id="previewStart">
-<div class="toast-title">🚀 Agent Start: claude</div>
-<div class="toast-message">Project: my-project | CWD: ~/code</div>
+<div class="toast-title">START · claude</div>
+<div class="toast-message">DIR: ~/code | PROJECT: my-project</div>
 </div>
 <div class="toast-preview clean" id="previewStop">
-<div class="toast-title">⏹️ Agent Stop: claude</div>
-<div class="toast-message">Project: my-project | CWD: ~/code</div>
+<div class="toast-title">STOP · claude</div>
+<div class="toast-message">DIR: ~/code | PROJECT: my-project</div>
 </div>
 </div>
 
@@ -169,14 +169,14 @@ function updatePreview() {
   previewStop.className = 'toast-preview ' + style;
 
   if (style === 'agent-badge') {
-    previewStart.innerHTML = '<div class="avatar">C</div><div><div class="toast-title">🚀 Agent Start: claude</div><div class="toast-message">Project: my-project</div></div>';
-    previewStop.innerHTML = '<div class="avatar">C</div><div><div class="toast-title">⏹️ Agent Stop: claude</div><div class="toast-message">Project: my-project</div></div>';
+    previewStart.innerHTML = '<div class="avatar">C</div><div><div class="toast-title">START · claude</div><div class="toast-message">DIR: ~/code | PROJECT: my-project</div></div>';
+    previewStop.innerHTML = '<div class="avatar">C</div><div><div class="toast-title">STOP · claude</div><div class="toast-message">DIR: ~/code | PROJECT: my-project</div></div>';
   } else if (style === 'status-color') {
-    previewStart.innerHTML = '<div class="toast-title" style="color:#4ade80">🚀 Agent Start: claude</div><div class="toast-message">Project: my-project | CWD: ~/code</div>';
-    previewStop.innerHTML = '<div class="toast-title" style="color:#f87171">⏹️ Agent Stop: claude</div><div class="toast-message">Project: my-project | CWD: ~/code</div>';
+    previewStart.innerHTML = '<div class="toast-title" style="color:#4ade80">START · claude</div><div class="toast-message">DIR: ~/code | PROJECT: my-project</div>';
+    previewStop.innerHTML = '<div class="toast-title" style="color:#f87171">STOP · claude</div><div class="toast-message">DIR: ~/code | PROJECT: my-project</div>';
   } else {
-    previewStart.innerHTML = '<div class="toast-title">🚀 Agent Start: claude</div><div class="toast-message">Project: my-project | CWD: ~/code</div>';
-    previewStop.innerHTML = '<div class="toast-title">⏹️ Agent Stop: claude</div><div class="toast-message">Project: my-project | CWD: ~/code</div>';
+    previewStart.innerHTML = '<div class="toast-title">START · claude</div><div class="toast-message">DIR: ~/code | PROJECT: my-project</div>';
+    previewStop.innerHTML = '<div class="toast-title">STOP · claude</div><div class="toast-message">DIR: ~/code | PROJECT: my-project</div>';
   }
 }
 
@@ -333,9 +333,9 @@ func (h *ConfigHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 
 	cfgMap := map[string]interface{}{
 		"notificationStyle": cfg.NotificationStyle,
-		"enabledEvents":      cfg.EnabledEvents,
-		"futureOverrides":    cfg.FutureOverrides,
-		"_path":              h.getConfigPath(),
+		"enabledEvents":     cfg.EnabledEvents,
+		"futureOverrides":   cfg.FutureOverrides,
+		"_path":             h.getConfigPath(),
 	}
 
 	w.Header().Set("Content-Type", "application/json")

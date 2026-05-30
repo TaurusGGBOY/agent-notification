@@ -244,10 +244,10 @@ function labelForStyle(style: NotificationStyle): string {
 }
 
 function previewText(style: NotificationStyle): string {
-  if (style === "status-color") return "用状态色条突出启动或停止事件。";
-  if (style === "agent-badge") return "突出 Agent 身份和项目来源。";
-  if (style === "compact") return "适合高频事件的一行紧凑通知。";
-  return "最接近系统默认通知的清爽布局。";
+  if (style === "status-color") return "用状态色和大写事件突出当前动作。";
+  if (style === "agent-badge") return "突出 Agent 身份、事件和目录。";
+  if (style === "compact") return "事件、Agent、目录压成一行优先扫描。";
+  return "事件、Agent、目录按优先级展示。";
 }
 
 function previewMarkup(style: NotificationStyle): string {
@@ -255,10 +255,11 @@ function previewMarkup(style: NotificationStyle): string {
     return `
       <div class="toast-preview preview-status">
         <span class="status-bar"></span>
-        <div>
-          <strong>Agent 已启动</strong>
+        <div class="toast-preview-copy">
+          <strong>START · Claude</strong>
           <span class="state-tag">START</span>
-          <p>AgentNotify 正在处理本地任务通知。</p>
+          <p>DIR: /Users/me/project/agent-notification</p>
+          <small>PROJECT: agent-notification</small>
         </div>
       </div>
     `;
@@ -266,11 +267,12 @@ function previewMarkup(style: NotificationStyle): string {
   if (style === "agent-badge") {
     return `
       <div class="toast-preview preview-badge">
-        <div class="agent-badge">AI</div>
-        <div>
-          <strong>Claude Code</strong>
-          <span>agent-notification</span>
-          <p>任务完成，通知已发送到 Windows。</p>
+        <div class="agent-badge">C</div>
+        <div class="toast-preview-copy">
+          <strong>STOP · Claude</strong>
+          <span>AGENT: Claude Code</span>
+          <p>DIR: /Users/me/project/agent-notification</p>
+          <small>任务完成，通知已发送到 Windows。</small>
         </div>
       </div>
     `;
@@ -278,19 +280,20 @@ function previewMarkup(style: NotificationStyle): string {
   if (style === "compact") {
     return `
       <div class="toast-preview preview-compact">
-        <strong>22:30</strong>
         <span>START</span>
-        <p>AgentNotify · 测试通知</p>
+        <strong>Claude</strong>
+        <p>DIR: /Users/me/project/agent-notification</p>
       </div>
     `;
   }
   return `
     <div class="toast-preview preview-clean">
       <div class="toast-logo">A</div>
-      <div>
-        <strong>系统通知预览</strong>
-        <span>agent-notification</span>
-        <p>适合多数事件的标准通知。</p>
+      <div class="toast-preview-copy">
+        <strong>START · Claude</strong>
+        <span>AGENT: Claude Code</span>
+        <p>DIR: /Users/me/project/agent-notification</p>
+        <small>PROJECT: agent-notification</small>
       </div>
     </div>
   `;

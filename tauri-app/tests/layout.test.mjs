@@ -21,3 +21,13 @@ test("main window uses the 1200x675 logical design size", async () => {
   assert.match(main, /width:\s*1200\.0/);
   assert.match(main, /height:\s*675\.0/);
 });
+
+test("toast preview puts event agent and directory in first-glance positions", async () => {
+  const ui = await readProjectFile("src/ui.ts");
+  const styles = await readProjectFile("src/styles.css");
+
+  assert.match(ui, /START · Claude/);
+  assert.ok(ui.includes("DIR: /Users/me/project/agent-notification"));
+  assert.doesNotMatch(ui, /Agent 已启动/);
+  assert.match(styles, /\.toast-preview\s+\.state-tag\s*{/);
+});

@@ -55,14 +55,16 @@ def configure_hooks(settings, server_url, agent, events):
     if "start" in events:
         start_cmd = (
             f'python3 {send_script} --url {server_url} --agent {agent} '
-            '--event start --project "${CLAUDE_PROJECT_DIR:-unknown}"'
+            '--event start --project "${CLAUDE_PROJECT_DIR:-unknown}" '
+            '--cwd "${CLAUDE_PROJECT_DIR:-$PWD}"'
         )
         hooks["SessionStart"] = [hook_entry(start_cmd)]
 
     if "stop" in events:
         stop_cmd = (
             f'python3 {send_script} --url {server_url} --agent {agent} '
-            '--event stop --project "${CLAUDE_PROJECT_DIR:-unknown}"'
+            '--event stop --project "${CLAUDE_PROJECT_DIR:-unknown}" '
+            '--cwd "${CLAUDE_PROJECT_DIR:-$PWD}"'
         )
         hooks["Stop"] = [hook_entry(stop_cmd)]
 
