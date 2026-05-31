@@ -16,7 +16,7 @@ make run            # local run (non-Windows: toast stub)
 ../scripts/install-skill.sh [--test]
 ```
 
-**Windows project path**: `D:\project\agent-notification`
+**Windows project path**: the local checkout directory
 
 ## Architecture
 

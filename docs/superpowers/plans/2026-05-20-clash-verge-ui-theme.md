@@ -1045,7 +1045,7 @@ ssh <user>@<host> "powershell -NoProfile -Command \"cd D:\\project\\agent-notifi
 Expected:
 
 ```text
-Built application at: D:\project\agent-notification\tauri-app\src-tauri\target\release\agent-notify.exe
+Built application at: agent-notification\tauri-app\src-tauri\target\release\agent-notify.exe
 Finished 2 bundles
 ```
 
@@ -1075,7 +1075,7 @@ Run:
 ```bash
 python3 skills/windows-ui-screenshot/scripts/capture_windows_ui.py \
   --host <user>@<host> \
-  --exe 'D:\project\agent-notification\tauri-app\src-tauri\target\release\agent-notify.exe' \
+  --exe 'agent-notification\tauri-app\src-tauri\target\release\agent-notify.exe' \
   --process agent-notify \
   --out /tmp/agentnotify-clash-verge-ui.png
 ```

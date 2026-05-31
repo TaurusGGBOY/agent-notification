@@ -200,8 +200,8 @@ UI：
 Windows 验证：
 
 - 同步前端和 Go server 文件到 Windows。
-- `cd D:\project\agent-notification\windows-server; go test ./... -v`
-- `cd D:\project\agent-notification\tauri-app; npm run tauri:build`
+- `cd agent-notification\windows-server; go test ./... -v`
+- `cd agent-notification\tauri-app; npm run tauri:build`
 - 使用 `skills/windows-ui-screenshot/scripts/capture_windows_ui.py` 拉截图。
 
 截图验收标准：

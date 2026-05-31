@@ -2130,7 +2130,7 @@ git commit -m "docs: add tauri client usage"
 On Windows:
 
 ```powershell
-cd D:\project\agent-notification\tauri-app
+cd agent-notification\tauri-app
 npm install
 npm run tauri:build
 ```
@@ -2223,7 +2223,7 @@ npm run tauri:dev
 Windows final:
 
 ```powershell
-cd D:\project\agent-notification\tauri-app
+cd agent-notification\tauri-app
 npm run tauri:build
 ```
 
