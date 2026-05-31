@@ -1,5 +1,4 @@
 import { invoke } from "@tauri-apps/api/core";
-import { isPermissionGranted, requestPermission, sendNotification } from "@tauri-apps/plugin-notification";
 
 const BASE_URL = "http://127.0.0.1:17891";
 
@@ -135,34 +134,6 @@ export async function sendTestNotification(event: EventName = "start"): Promise<
   if (!res.ok) {
     throw new Error(`send test notification failed: ${res.status}`);
   }
-
-  try {
-    const windowsNotifications = await getWindowsNotificationStatus();
-    if (!windowsNotifications.supported) {
-      await sendNativeTestNotification(event);
-    }
-  } catch (err) {
-    console.warn("native test notification failed", err);
-    await sendNativeTestNotification(event);
-  }
-}
-
-export async function sendNativeTestNotification(event: EventName = "start"): Promise<boolean> {
-  let permissionGranted = await isPermissionGranted();
-  if (!permissionGranted) {
-    const permission = await requestPermission();
-    permissionGranted = permission === "granted";
-  }
-
-  if (!permissionGranted) {
-    return false;
-  }
-
-  sendNotification({
-    title: "AgentNotify",
-    body: `${event === "start" ? "启动" : "停止"} · 来自 AgentNotify 的测试通知`,
-  });
-  return true;
 }
 
 async function getJson<T>(path: string): Promise<T> {

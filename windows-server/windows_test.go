@@ -228,6 +228,41 @@ func TestNotifyHandler_ReloadsConfigAndNormalizesStyle(t *testing.T) {
 	}
 }
 
+func TestNotifyHandler_ForwardsNotificationToTauriInsteadOfNativeNotifier(t *testing.T) {
+	cfg := DefaultConfig()
+	server := newTestServer(cfg)
+	notifier := server.notifier.(*recordingNotifier)
+	var forwarded bytes.Buffer
+	server.notificationForwarder = stdoutNotificationForwarder{writer: &forwarded}
+
+	body := `{"agent":"codex","event":"start","project":"agent-notification","message":"hello"}`
+	req := httptest.NewRequest(http.MethodPost, "/notify", bytes.NewBufferString(body))
+	w := httptest.NewRecorder()
+
+	server.NotifyHandler(w, req)
+
+	if w.Code != http.StatusNoContent {
+		t.Fatalf("status = %d, want %d", w.Code, http.StatusNoContent)
+	}
+	if len(notifier.calls) != 0 {
+		t.Fatalf("native notifier calls = %d, want 0 when forwarding to Tauri", len(notifier.calls))
+	}
+	line := forwarded.String()
+	if !strings.HasPrefix(line, tauriNotificationPrefix) {
+		t.Fatalf("forwarded line = %q, want prefix %q", line, tauriNotificationPrefix)
+	}
+	var payload tauriNotificationPayload
+	if err := json.Unmarshal([]byte(strings.TrimPrefix(strings.TrimSpace(line), tauriNotificationPrefix)), &payload); err != nil {
+		t.Fatalf("forwarded payload is not JSON: %v", err)
+	}
+	if payload.Title != "开始通知" {
+		t.Fatalf("title = %q, want 开始通知", payload.Title)
+	}
+	if !strings.Contains(payload.Body, "agent-notification 已启动") {
+		t.Fatalf("body = %q, want formatted notification body", payload.Body)
+	}
+}
+
 func TestNotifyHandler_UsesWorkdirAliasInMessage(t *testing.T) {
 	cfg := DefaultConfig()
 	server := newTestServer(cfg)

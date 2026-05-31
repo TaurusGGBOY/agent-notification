@@ -1,6 +1,7 @@
 #![cfg_attr(not(debug_assertions), windows_subsystem = "windows")]
 
 mod lifecycle;
+mod native_notification;
 mod notification_settings;
 mod service;
 mod tray;
@@ -26,7 +27,6 @@ fn set_app_theme(app: tauri::AppHandle, theme: String) -> Result<(), String> {
 
 fn main() {
     tauri::Builder::default()
-        .plugin(tauri_plugin_notification::init())
         .plugin(tauri_plugin_shell::init())
         .enable_macos_default_menu(false)
         .manage(service::ServiceState::new())

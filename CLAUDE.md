@@ -1,9 +1,30 @@
 # Agent Notes
 
-## DMG Packaging Worktree
+## Local macOS DMG and Toast Verification
 
 - Use `/Users/gaoguobin/project/agent-notification/.worktrees/package-dmg-20260531` for local macOS DMG packaging experiments.
 - Keep the repository root worktree on `main` for sync/inspection only. Do not create build artifacts in the root worktree.
+- For code fixes, run verification from the active feature worktree for that task. Treat the paths below as templates and replace the worktree path with the active feature worktree path before running commands.
+- Before every local macOS app/toast verification, force-stop any existing `AgentNotify` client and `agent-notify-server`, then confirm port `17891` is free before launching the build under test:
+
+```bash
+pkill -f '/AgentNotify.app/Contents/MacOS/agent-notify-server' 2>/dev/null || true
+pkill -f '/AgentNotify.app/Contents/MacOS/agent-notify' 2>/dev/null || true
+pkill -f 'agent-notify-server' 2>/dev/null || true
+pkill -f 'AgentNotify' 2>/dev/null || true
+sleep 2
+ps -axo pid,ppid,comm,args | rg -i 'AgentNotify|agent-notify' || true
+lsof -nP -iTCP:17891 -sTCP:LISTEN || true
+```
+
+- For local toast verification against a Tauri-built `.app`, ad-hoc sign the app bundle before launch. An unsigned or partially signed bundle can make `UNUserNotificationCenter` fail authorization even when macOS notification settings are enabled:
+
+```bash
+APP="/Users/gaoguobin/project/agent-notification/.worktrees/package-dmg-20260531/tauri-app/src-tauri/target/release/bundle/macos/AgentNotify.app"
+codesign --force --deep --sign - "$APP"
+codesign --verify --deep --strict --verbose=2 "$APP"
+```
+
 - Before packaging, update the packaging worktree to latest `origin/main`:
 
 ```bash
