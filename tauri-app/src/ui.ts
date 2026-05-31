@@ -9,7 +9,7 @@ import { state } from "./state";
 import { applyTheme, getInitialTheme, toggleTheme, type AppTheme } from "./theme";
 import { getCurrentWindow } from "@tauri-apps/api/window";
 
-const SKILL_INSTALL_COMMAND = "npx github:TaurusGGBOY/agent-notification";
+const SKILL_INSTALL_COMMAND = "npx skills add TaurusGGBOY/agent-notification";
 let currentTheme: AppTheme = getInitialTheme();
 
 export function render(): void {
