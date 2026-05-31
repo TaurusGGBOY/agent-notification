@@ -160,20 +160,20 @@ func TestRenderToastCardWritesScaledPNGWithEventAccent(t *testing.T) {
 func TestToastCardSummaryLinesPrioritizeEventAgentAndDirectory(t *testing.T) {
 	card := ToastCard{
 		Event:   "stop",
-		Title:   "STOP · codex",
+		Title:   "完成通知",
 		Agent:   "codex",
-		Message: "DIR: /Users/me/project | PROJECT: agent-notification | DIR: done",
+		Message: "agent-notification 已停止",
 	}
 
 	eventAgent, directory, detail := toastCardSummaryLines(card)
-	if eventAgent != "STOP · codex" {
-		t.Fatalf("eventAgent = %q, want STOP · codex", eventAgent)
+	if eventAgent != "完成通知" {
+		t.Fatalf("eventAgent = %q, want 完成通知", eventAgent)
 	}
-	if directory != "/Users/me/project" {
-		t.Fatalf("directory = %q, want /Users/me/project", directory)
+	if directory != "unknown" {
+		t.Fatalf("directory = %q, want unknown", directory)
 	}
-	if detail != "PROJECT: agent-notification | DIR: done" {
-		t.Fatalf("detail = %q, want project detail", detail)
+	if detail != "agent-notification 已停止" {
+		t.Fatalf("detail = %q, want agent-notification 已停止", detail)
 	}
 }
 

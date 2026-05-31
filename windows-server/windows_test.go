@@ -245,8 +245,8 @@ func TestNotifyHandler_UsesWorkdirAliasInMessage(t *testing.T) {
 	if len(notifier.calls) != 1 {
 		t.Fatalf("expected 1 notification, got %d", len(notifier.calls))
 	}
-	if !strings.Contains(notifier.calls[0].message, "DIR: project") {
-		t.Fatalf("message = %q, want workdir folder name", notifier.calls[0].message)
+	if !strings.Contains(notifier.calls[0].message, "project 已停止") {
+		t.Fatalf("message = %q, want project 已停止", notifier.calls[0].message)
 	}
 }
 
@@ -326,11 +326,11 @@ func TestFormatTitle(t *testing.T) {
 		event  string
 		expect string
 	}{
-		{"claude", "start", "START · claude"},
-		{"claude", "stop", "STOP · claude"},
-		{"test-agent", "start", "START · test-agent"},
-		{"", "start", "START · unknown"},
-		{"claude", "unknown", "EVENT · claude"},
+		{"claude", "start", "开始通知"},
+		{"claude", "stop", "完成通知"},
+		{"test-agent", "start", "开始通知"},
+		{"", "start", "开始通知"},
+		{"claude", "unknown", "通知"},
 	}
 
 	for _, tt := range tests {
@@ -345,80 +345,62 @@ func TestFormatMessage(t *testing.T) {
 	tests := []struct {
 		name     string
 		payload  NotifyPayload
-		contains string
+		expected string
 	}{
 		{
-			name:     "with project",
-			payload:  NotifyPayload{Project: "my-project"},
-			contains: "PROJECT: my-project",
+			name:     "stop with project",
+			payload:  NotifyPayload{Event: "stop", Project: "my-project"},
+			expected: "my-project 已停止",
 		},
 		{
-			name:     "with cwd",
-			payload:  NotifyPayload{Cwd: "~/code"},
-			contains: "DIR: code",
+			name:     "start with cwd",
+			payload:  NotifyPayload{Event: "start", Cwd: "~/code"},
+			expected: "code 已启动",
 		},
 		{
-			name:     "with message",
-			payload:  NotifyPayload{Message: "hello world"},
-			contains: "hello world",
+			name:     "stop no project",
+			payload:  NotifyPayload{Event: "stop"},
+			expected: "已停止",
 		},
 		{
-			name:     "with timestamp",
-			payload:  NotifyPayload{Timestamp: "2024-01-15T10:30:00Z"},
-			contains: "10:30:00",
-		},
-		{
-			name:     "empty returns default",
-			payload:  NotifyPayload{},
-			contains: "Agent event occurred",
+			name:     "start no project",
+			payload:  NotifyPayload{Event: "start"},
+			expected: "已启动",
 		},
 	}
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			got := formatMessage(tt.payload)
-			if tt.contains != "" && !bytes.Contains([]byte(got), []byte(tt.contains)) {
-				t.Errorf("formatMessage() = %q, want to contain %q", got, tt.contains)
+			if got != tt.expected {
+				t.Errorf("formatMessage() = %q, want %q", got, tt.expected)
 			}
 		})
 	}
 }
 
-func TestFormatMessage_MultipleFields(t *testing.T) {
+func TestFormatMessage_ProjectPrioritizedOverCwd(t *testing.T) {
 	payload := NotifyPayload{
+		Event:   "stop",
 		Project: "test-project",
 		Cwd:     "/home/user",
-		Message: "test message",
 	}
 
 	got := formatMessage(payload)
-	want := "DIR: user | PROJECT: test-project | test message"
+	want := "test-project 已停止"
 	if got != want {
 		t.Fatalf("formatMessage() = %q, want %q", got, want)
-	}
-
-	if !bytes.Contains([]byte(got), []byte("test-project")) {
-		t.Error("should contain project")
-	}
-	if !bytes.Contains([]byte(got), []byte("user")) {
-		t.Error("should contain folder name")
-	}
-	if !bytes.Contains([]byte(got), []byte("test message")) {
-		t.Error("should contain message")
-	}
-	if !bytes.Contains([]byte(got), []byte(" | ")) {
-		t.Error("parts should be joined with ' | '")
 	}
 }
 
 func TestFormatMessage_TreatsPathProjectAsDirectoryWhenCwdMissing(t *testing.T) {
 	payload := NotifyPayload{
+		Event:   "stop",
 		Project: "/Users/me/project",
-		Message: "done",
 	}
 
 	got := formatMessage(payload)
-	want := "DIR: project | done"
+	want := "project 已停止"
 	if got != want {
 		t.Fatalf("formatMessage() = %q, want %q", got, want)
 	}
@@ -426,12 +408,12 @@ func TestFormatMessage_TreatsPathProjectAsDirectoryWhenCwdMissing(t *testing.T) 
 
 func TestFormatMessage_DoesNotTreatRepoSlugProjectAsDirectory(t *testing.T) {
 	payload := NotifyPayload{
+		Event:   "stop",
 		Project: "TaurusGGBOY/agent-notification",
-		Message: "done",
 	}
 
 	got := formatMessage(payload)
-	want := "PROJECT: TaurusGGBOY/agent-notification | done"
+	want := "TaurusGGBOY/agent-notification 已停止"
 	if got != want {
 		t.Fatalf("formatMessage() = %q, want %q", got, want)
 	}
@@ -439,13 +421,14 @@ func TestFormatMessage_DoesNotTreatRepoSlugProjectAsDirectory(t *testing.T) {
 
 func TestFormatMessage_ShowsLastFolderNameOnly(t *testing.T) {
 	payload := NotifyPayload{
-		Cwd:     "/Users/me/work/company/platform/services/agent-notification/tauri-app/src",
-		Message: "done",
+		Event: "stop",
+		Cwd:   "/Users/me/work/company/platform/services/agent-notification/tauri-app/src",
 	}
 
 	got := formatMessage(payload)
-	if !strings.Contains(got, "DIR: src") {
-		t.Fatalf("formatMessage() = %q, want last folder name only", got)
+	want := "src 已停止"
+	if got != want {
+		t.Fatalf("formatMessage() = %q, want %q", got, want)
 	}
 }
 

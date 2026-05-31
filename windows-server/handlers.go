@@ -267,16 +267,17 @@ func (s *Server) currentConfig() *Config {
 }
 
 func formatTitle(agent, event string) string {
-	agent = strings.TrimSpace(agent)
-	if agent == "" {
-		agent = "unknown"
+	switch strings.ToLower(strings.TrimSpace(event)) {
+	case "start":
+		return "开始通知"
+	case "stop":
+		return "完成通知"
+	default:
+		return "通知"
 	}
-	return eventLabel(event) + " · " + agent
 }
 
 func formatMessage(payload NotifyPayload) string {
-	parts := []string{}
-
 	workdir := strings.TrimSpace(payload.Cwd)
 	if workdir == "" {
 		workdir = strings.TrimSpace(payload.Workdir)
@@ -286,31 +287,32 @@ func formatMessage(payload NotifyPayload) string {
 		workdir = project
 		project = ""
 	}
-	if workdir != "" {
-		parts = append(parts, "DIR: "+lastFolderName(workdir))
-	}
 
-	if project != "" && project != workdir && !strings.EqualFold(project, "unknown") {
-		parts = append(parts, "PROJECT: "+project)
-	}
-
-	if message := strings.TrimSpace(payload.Message); message != "" {
-		parts = append(parts, message)
-	}
-
-	if payload.Timestamp != "" {
-		if _, err := time.Parse(time.RFC3339, payload.Timestamp); err == nil {
-			if t, err := time.Parse(time.RFC3339, payload.Timestamp); err == nil {
-				parts = append(parts, "at "+t.Format("15:04:05"))
-			}
+	name := project
+	if name == "" || strings.EqualFold(name, "unknown") {
+		if workdir != "" {
+			name = lastFolderName(workdir)
 		}
 	}
 
-	if len(parts) == 0 {
-		return "Agent event occurred"
+	event := strings.ToLower(strings.TrimSpace(payload.Event))
+	switch event {
+	case "start":
+		if name != "" {
+			return name + " 已启动"
+		}
+		return "已启动"
+	case "stop":
+		if name != "" {
+			return name + " 已停止"
+		}
+		return "已停止"
+	default:
+		if name != "" {
+			return name
+		}
+		return ""
 	}
-
-	return strings.Join(parts, " | ")
 }
 
 func eventLabel(event string) string {
