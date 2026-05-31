@@ -1,4 +1,4 @@
-import { getBroadcastStatus, getConfig, getManifest, getNotificationHistory, getWindowsNotificationStatus } from "./api";
+import { getBroadcastStatus, getConfig, getMacosNotificationStatus, getManifest, getNotificationHistory, getWindowsNotificationStatus } from "./api";
 import { state } from "./state";
 
 export async function refreshState(): Promise<void> {
@@ -7,6 +7,7 @@ export async function refreshState(): Promise<void> {
   state.historyError = "";
   state.broadcastError = "";
   state.windowsNotificationError = "";
+  state.macosNotificationError = "";
   try {
     const [config, manifest] = await Promise.all([getConfig(), getManifest()]);
     state.config = config;
@@ -37,5 +38,12 @@ export async function refreshState(): Promise<void> {
   } catch (err) {
     state.windowsNotifications = null;
     state.windowsNotificationError = err instanceof Error ? err.message : String(err);
+  }
+
+  try {
+    state.macosNotifications = await getMacosNotificationStatus();
+  } catch (err) {
+    state.macosNotifications = null;
+    state.macosNotificationError = err instanceof Error ? err.message : String(err);
   }
 }

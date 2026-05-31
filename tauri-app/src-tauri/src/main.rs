@@ -34,6 +34,8 @@ fn main() {
         .invoke_handler(tauri::generate_handler![
             notification_settings::open_windows_notification_settings,
             notification_settings::windows_notification_status,
+            notification_settings::open_macos_notification_settings,
+            notification_settings::macos_notification_status,
             service::service_status,
             service::restart_service,
             set_app_theme

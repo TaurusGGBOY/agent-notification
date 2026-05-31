@@ -33,6 +33,11 @@ export interface WindowsNotificationStatus {
   supported: boolean;
 }
 
+export interface MacosNotificationStatus {
+  enabled: boolean;
+  supported: boolean;
+}
+
 export interface NotificationHistoryItem {
   time: string;
   agent: string;
@@ -94,6 +99,14 @@ export async function getWindowsNotificationStatus(): Promise<WindowsNotificatio
 
 export async function openWindowsNotificationSettings(): Promise<void> {
   await invoke("open_windows_notification_settings");
+}
+
+export async function getMacosNotificationStatus(): Promise<MacosNotificationStatus> {
+  return await invoke<MacosNotificationStatus>("macos_notification_status");
+}
+
+export async function openMacosNotificationSettings(): Promise<void> {
+  await invoke("open_macos_notification_settings");
 }
 
 export async function sendTestNotification(event: EventName = "start"): Promise<void> {

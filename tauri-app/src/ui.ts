@@ -1,4 +1,5 @@
 import {
+  openMacosNotificationSettings,
   openWindowsNotificationSettings,
   sendTestNotification,
   setBroadcastEnabled,
@@ -31,6 +32,18 @@ export function render(): void {
       : "检测中";
   const windowsNotificationDisabled = !windowsNotificationsSupported || Boolean(state.windowsNotificationError);
   const windowsNotificationTitle = windowsNotificationDisabled ? "当前环境不可用" : "打开 Windows 通知设置";
+
+  const macosNotificationsEnabled = state.macosNotifications?.enabled === true;
+  const macosNotificationsSupported = state.macosNotifications?.supported === true;
+  const macosNotificationStatus = state.macosNotificationError
+    ? "不可用"
+    : state.macosNotifications
+      ? macosNotificationsSupported
+        ? ""
+        : "仅 macOS"
+      : "检测中";
+  const macosNotificationDisabled = !macosNotificationsSupported || Boolean(state.macosNotificationError);
+  const macosNotificationTitle = macosNotificationDisabled ? "当前环境不可用" : "打开 macOS 通知设置";
 
   app.innerHTML = `
     <section class="app-shell">
@@ -69,6 +82,21 @@ export function render(): void {
               title="${escapeHtml(windowsNotificationTitle)}"
               aria-pressed="${windowsNotificationsEnabled}"
               ${windowsNotificationDisabled ? "disabled" : ""}
+            >
+              <i></i>
+            </button>
+          </div>
+          <div class="notification-row">
+            <span class="summary-label">
+              macOS 通知
+              ${macosNotificationStatus ? `<em>${escapeHtml(macosNotificationStatus)}</em>` : ""}
+            </span>
+            <button
+              class="switch ${macosNotificationsEnabled ? "on" : ""}"
+              data-action="macos-notifications"
+              title="${escapeHtml(macosNotificationTitle)}"
+              aria-pressed="${macosNotificationsEnabled}"
+              ${macosNotificationDisabled ? "disabled" : ""}
             >
               <i></i>
             </button>
@@ -174,6 +202,17 @@ function bindEvents(): void {
     }
   });
 
+  document.querySelector<HTMLButtonElement>('[data-action="macos-notifications"]')?.addEventListener("click", async () => {
+    if (state.macosNotifications?.supported !== true) return;
+    try {
+      await openMacosNotificationSettings();
+      pollMacosNotificationStatus();
+    } catch (err) {
+      state.macosNotificationError = err instanceof Error ? err.message : String(err);
+      render();
+    }
+  });
+
   document.querySelector<HTMLButtonElement>('[data-action="copy-skill-install-command"]')?.addEventListener("click", async (event) => {
     const button = event.currentTarget as HTMLButtonElement;
     button.disabled = true;
@@ -225,6 +264,24 @@ async function copySkillInstallCommand(): Promise<void> {
 }
 
 function pollWindowsNotificationStatus(): void {
+  let attempts = 0;
+  const refresh = async () => {
+    attempts += 1;
+    await refreshState();
+    render();
+    if (attempts < 15) {
+      window.setTimeout(() => {
+        void refresh();
+      }, 1000);
+    }
+  };
+
+  window.setTimeout(() => {
+    void refresh();
+  }, 600);
+}
+
+function pollMacosNotificationStatus(): void {
   let attempts = 0;
   const refresh = async () => {
     attempts += 1;
