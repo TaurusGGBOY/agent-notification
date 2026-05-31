@@ -42,6 +42,46 @@ func TestToastCardPathUsesLocalAppDataAndFallback(t *testing.T) {
 	}
 }
 
+func TestToastAppLogoPathAndRenderWritesPNG(t *testing.T) {
+	oldLocalAppData := os.Getenv("LOCALAPPDATA")
+	defer os.Setenv("LOCALAPPDATA", oldLocalAppData)
+
+	tmpDir := t.TempDir()
+	os.Setenv("LOCALAPPDATA", tmpDir)
+
+	path, err := toastAppLogoPath()
+	if err != nil {
+		t.Fatalf("toastAppLogoPath failed: %v", err)
+	}
+	if want := filepath.Join(tmpDir, "AgentNotify", "app-logo.png"); path != want {
+		t.Fatalf("logo path = %q, want %q", path, want)
+	}
+
+	if err := renderToastAppLogo(path); err != nil {
+		t.Fatalf("renderToastAppLogo failed: %v", err)
+	}
+
+	file, err := os.Open(path)
+	if err != nil {
+		t.Fatalf("open rendered logo failed: %v", err)
+	}
+	defer file.Close()
+
+	img, err := png.Decode(file)
+	if err != nil {
+		t.Fatalf("decode rendered logo failed: %v", err)
+	}
+	if got, want := img.Bounds().Dx(), 256; got != want {
+		t.Fatalf("logo width = %d, want %d", got, want)
+	}
+	if got, want := img.Bounds().Dy(), 256; got != want {
+		t.Fatalf("logo height = %d, want %d", got, want)
+	}
+	if _, _, _, alpha := img.At(0, 0).RGBA(); alpha == 0 {
+		t.Fatal("logo background should be opaque")
+	}
+}
+
 func TestRenderToastCardWritesScaledPNGWithEventAccent(t *testing.T) {
 	testCases := []struct {
 		name   string
@@ -126,6 +166,34 @@ func TestCompactDirectoryForDisplayPreservesTailForDeepPaths(t *testing.T) {
 	}
 }
 
+func TestCompactDirectoryForDisplayFallsBackToTailTruncation(t *testing.T) {
+	if got := compactDirectoryForDisplay("abcdef", 3); got != "def" {
+		t.Fatalf("small max compact path = %q, want def", got)
+	}
+	if got := compactDirectoryForDisplay("abcdef", 5); got != "...ef" {
+		t.Fatalf("tail compact path = %q, want ...ef", got)
+	}
+	if got := compactDirectoryForDisplay("abc", 5); got != "abc" {
+		t.Fatalf("short compact path = %q, want abc", got)
+	}
+}
+
+func TestHasWindowsDriveRootValidatesDriveAndSeparator(t *testing.T) {
+	valid := []string{`C:\Users\me`, "d:/work"}
+	for _, path := range valid {
+		if !hasWindowsDriveRoot(path) {
+			t.Fatalf("hasWindowsDriveRoot(%q) = false, want true", path)
+		}
+	}
+
+	invalid := []string{"", "C:", "1:/work", "C|/work", "C:work"}
+	for _, path := range invalid {
+		if hasWindowsDriveRoot(path) {
+			t.Fatalf("hasWindowsDriveRoot(%q) = true, want false", path)
+		}
+	}
+}
+
 func TestDrawCircleOnlyPaintsInsideBounds(t *testing.T) {
 	img := image.NewRGBA(image.Rect(0, 0, 20, 20))
 	drawCircle(img, 0, 0, 5, image.Black)
@@ -150,17 +218,18 @@ func TestTruncateTextHandlesWhitespaceRuneAndSmallLimits(t *testing.T) {
 	}
 }
 
-func TestToastXMLCustomCardAndImageAttributes(t *testing.T) {
-	xml := formatToastXML("custom-card", "start", `Title & "quoted"`, "codex", "Project", `C:\Temp\toast card.png`)
+func TestToastXMLCleanLogoAndImageAttributes(t *testing.T) {
+	xml := formatToastXML("custom-card", "start", `Title & "quoted"`, "message", "codex", "Project", `C:\Temp\app-logo.png`)
 
 	for _, want := range []string{
-		`<image placement="hero"`,
-		`src="C:\Temp\toast card.png"`,
+		`<image placement="appLogoOverride"`,
+		`hint-crop="circle"`,
+		`src="C:\Temp\app-logo.png"`,
 		`Title &amp; &quot;quoted&quot;`,
-		`<text>Project</text>`,
+		`placement="attribution">Project`,
 	} {
 		if !strings.Contains(xml, want) {
-			t.Fatalf("custom card XML missing %q in %s", want, xml)
+			t.Fatalf("clean XML missing %q in %s", want, xml)
 		}
 	}
 
@@ -203,10 +272,13 @@ func TestAgentInitialHandlesEmptyWhitespaceAndUnicode(t *testing.T) {
 	}
 }
 
-func TestStatusColorXMLStartAttribution(t *testing.T) {
-	xml := formatToastXML("status-color", "start", "Agent Started", "codex", "agent-notification", "")
-	if !strings.Contains(xml, `placement="attribution">Started`) {
-		t.Fatalf("status color start XML missing Started attribution: %s", xml)
+func TestFormatToastXMLAlwaysClean(t *testing.T) {
+	xml := formatToastXML("status-color", "start", "Agent Started", "message", "codex", "agent-notification", "")
+	if strings.Contains(xml, `STATUS ·`) || strings.Contains(xml, `<group>`) || strings.Contains(xml, `placement="hero"`) {
+		t.Fatalf("toast XML should stay clean: %s", xml)
+	}
+	if !strings.Contains(xml, `placement="attribution">agent-notification`) {
+		t.Fatalf("clean toast XML missing attribution: %s", xml)
 	}
 }
 
@@ -278,7 +350,7 @@ func TestCurrentConfigFallsBackToCachedConfigOnLoadError(t *testing.T) {
 	}
 
 	cached := &Config{
-		NotificationStyle: "compact",
+		NotificationStyle: "clean",
 		EnabledEvents:     []string{"stop"},
 		FutureOverrides:   map[string]string{},
 	}
@@ -287,8 +359,8 @@ func TestCurrentConfigFallsBackToCachedConfigOnLoadError(t *testing.T) {
 	if got := server.currentConfig(); got != cached {
 		t.Fatal("currentConfig should return cached config when LoadConfig fails")
 	}
-	if server.config.NotificationStyle != "compact" {
-		t.Fatalf("cached style = %q, want compact", server.config.NotificationStyle)
+	if server.config.NotificationStyle != "clean" {
+		t.Fatalf("cached style = %q, want clean", server.config.NotificationStyle)
 	}
 }
 

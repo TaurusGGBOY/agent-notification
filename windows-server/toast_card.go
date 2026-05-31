@@ -32,6 +32,14 @@ type ToastCard struct {
 }
 
 func toastCardPath() (string, error) {
+	return toastAssetPath("toast-card.png")
+}
+
+func toastAppLogoPath() (string, error) {
+	return toastAssetPath("app-logo.png")
+}
+
+func toastAssetPath(fileName string) (string, error) {
 	base := os.Getenv("LOCALAPPDATA")
 	if base == "" {
 		base = filepath.Join(os.TempDir(), "AgentNotify")
@@ -41,7 +49,7 @@ func toastCardPath() (string, error) {
 	if err := os.MkdirAll(base, 0755); err != nil {
 		return "", err
 	}
-	return filepath.Join(base, "toast-card.png"), nil
+	return filepath.Join(base, fileName), nil
 }
 
 func loadTTFFont(sizePt float64) (font.Face, error) {
@@ -124,6 +132,40 @@ func renderToastCard(path string, card ToastCard) error {
 		drawTextWithFace(img, scale(44), scale(148), truncateText(detail, 44), color.RGBA{R: 148, G: 163, B: 184, A: 255}, face)
 	} else {
 		drawTextWithFace(img, scale(44), scale(145), truncateText(detail, 46), color.RGBA{R: 148, G: 163, B: 184, A: 255}, basicfont.Face7x13)
+	}
+
+	f, err := os.Create(path)
+	if err != nil {
+		return err
+	}
+	defer f.Close()
+	return png.Encode(f, img)
+}
+
+func renderToastAppLogo(path string) error {
+	const size = 256
+	img := image.NewRGBA(image.Rect(0, 0, size, size))
+	bg := color.RGBA{R: 15, G: 124, B: 255, A: 255}
+	bg2 := color.RGBA{R: 98, G: 180, B: 255, A: 255}
+	white := color.RGBA{R: 255, G: 255, B: 255, A: 255}
+
+	for y := 0; y < size; y++ {
+		for x := 0; x < size; x++ {
+			t := float64(x+y) / float64((size-1)*2)
+			c := color.RGBA{
+				R: uint8(float64(bg.R)*(1-t) + float64(bg2.R)*t),
+				G: uint8(float64(bg.G)*(1-t) + float64(bg2.G)*t),
+				B: uint8(float64(bg.B)*(1-t) + float64(bg2.B)*t),
+				A: 255,
+			}
+			img.SetRGBA(x, y, c)
+		}
+	}
+
+	if face, err := loadTTFFont(132); err == nil {
+		drawTextWithFace(img, 78, 174, "A", white, face)
+	} else {
+		drawTextWithFace(img, 104, 138, "A", white, basicfont.Face7x13)
 	}
 
 	f, err := os.Create(path)

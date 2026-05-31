@@ -3,7 +3,7 @@ import { isPermissionGranted, requestPermission, sendNotification } from "@tauri
 
 const BASE_URL = "http://127.0.0.1:17891";
 
-export type NotificationStyle = "clean" | "status-color" | "agent-badge" | "compact";
+export type NotificationStyle = "clean";
 export type EventName = "start" | "stop";
 
 export interface AgentConfig {

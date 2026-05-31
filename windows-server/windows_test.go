@@ -187,7 +187,7 @@ func TestNotifyHandler_DisabledEvent(t *testing.T) {
 	}
 }
 
-func TestNotifyHandler_ReloadsConfigForStyleChanges(t *testing.T) {
+func TestNotifyHandler_ReloadsConfigAndNormalizesStyle(t *testing.T) {
 	tmpDir := t.TempDir()
 	oldAppData := os.Getenv("APPDATA")
 	os.Setenv("APPDATA", tmpDir)
@@ -222,8 +222,8 @@ func TestNotifyHandler_ReloadsConfigForStyleChanges(t *testing.T) {
 	if len(notifier.calls) != 1 {
 		t.Fatalf("expected 1 notification, got %d", len(notifier.calls))
 	}
-	if notifier.calls[0].style != "agent-badge" {
-		t.Fatalf("style = %q, want agent-badge", notifier.calls[0].style)
+	if notifier.calls[0].style != "clean" {
+		t.Fatalf("style = %q, want clean", notifier.calls[0].style)
 	}
 }
 
@@ -527,7 +527,7 @@ func TestManifestResponse_Fields(t *testing.T) {
 		ServiceType:     "_agent-notify._tcp.local.",
 		Description:     "Windows notification server",
 		SupportedEvents: []string{"start", "stop"},
-		SupportedStyles: []string{"clean", "status-color", "agent-badge", "compact"},
+		SupportedStyles: []string{"clean"},
 	}
 
 	data, err := json.Marshal(resp)
@@ -572,14 +572,11 @@ func TestSettingsHandler_GET(t *testing.T) {
 	if !bytes.Contains([]byte(body), []byte("AgentNotify 设置")) {
 		t.Error("expected HTML title in response")
 	}
-	if !bytes.Contains([]byte(body), []byte("START · claude")) {
-		t.Error("expected settings preview to show event and agent first")
+	if bytes.Contains([]byte(body), []byte("通知样式")) {
+		t.Error("settings page should not expose notification style controls")
 	}
-	if !bytes.Contains([]byte(body), []byte("DIR: ~/code")) {
-		t.Error("expected settings preview to show directory first")
-	}
-	if bytes.Contains([]byte(body), []byte("Agent Start: claude")) {
-		t.Error("settings preview should not use old title format")
+	if bytes.Contains([]byte(body), []byte("预览")) {
+		t.Error("settings page should not expose notification preview")
 	}
 }
 
@@ -615,8 +612,8 @@ func TestSettingsHandler_POST_SaveConfig(t *testing.T) {
 	var cfg Config
 	json.Unmarshal(data, &cfg)
 
-	if cfg.NotificationStyle != "agent-badge" {
-		t.Errorf("expected style 'agent-badge', got %q", cfg.NotificationStyle)
+	if cfg.NotificationStyle != "clean" {
+		t.Errorf("expected style 'clean', got %q", cfg.NotificationStyle)
 	}
 }
 
@@ -661,8 +658,8 @@ func TestSettingsHandler_WrongMethod(t *testing.T) {
 // === Style Validation Tests ===
 
 func TestIsValidStyle(t *testing.T) {
-	validStyles := []string{"clean", "status-color", "agent-badge", "compact"}
-	invalidStyles := []string{"invalid", "fancy", "", "CLEAN"}
+	validStyles := []string{"clean"}
+	invalidStyles := []string{"invalid", "fancy", "", "CLEAN", "status-color", "agent-badge", "compact", "custom-card"}
 
 	for _, s := range validStyles {
 		if !isValidStyle(s) {
@@ -723,8 +720,8 @@ func TestSettingsHandler_SaveLoadRoundTrip(t *testing.T) {
 	var loaded map[string]interface{}
 	json.NewDecoder(w2.Body).Decode(&loaded)
 
-	if loaded["notificationStyle"] != "compact" {
-		t.Errorf("style mismatch: got %v, want compact", loaded["notificationStyle"])
+	if loaded["notificationStyle"] != "clean" {
+		t.Errorf("style mismatch: got %v, want clean", loaded["notificationStyle"])
 	}
 
 	events := loaded["enabledEvents"].([]interface{})
@@ -912,7 +909,7 @@ func TestSettingsHandler_InvalidEventNotSaved(t *testing.T) {
 // === XML Generation Tests ===
 
 func TestFormatToastXML_Clean(t *testing.T) {
-	xml := formatToastXML("clean", "start", "Agent Started", "claude", "agent-notification", "")
+	xml := formatToastXML("clean", "start", "Agent Started", "message", "claude", "agent-notification", "")
 	if !strings.Contains(xml, `template="ToastGeneric"`) {
 		t.Error("clean style should use ToastGeneric template")
 	}
@@ -921,42 +918,46 @@ func TestFormatToastXML_Clean(t *testing.T) {
 	}
 }
 
-func TestFormatToastXML_StatusColor(t *testing.T) {
-	xml := formatToastXML("status-color", "stop", "Agent Stopped", "claude", "agent-notification", "")
-	if !strings.Contains(xml, `placement="attribution"`) {
-		t.Error("status-color should have attribution text")
+func TestFormatToastXML_CleanIncludesAppLogoOverride(t *testing.T) {
+	xml := formatToastXML("clean", "start", "Agent Started", "message", "claude", "agent-notification", `C:\Temp\agentnotify-logo.png`)
+	if !strings.Contains(xml, `placement="appLogoOverride"`) {
+		t.Fatalf("clean toast XML missing app logo override: %s", xml)
 	}
-	if !strings.Contains(xml, "Stopped") {
-		t.Error("status-color should include stopped attribution")
+	if !strings.Contains(xml, `hint-crop="circle"`) {
+		t.Fatalf("clean toast XML missing circular crop: %s", xml)
 	}
-}
-
-func TestFormatToastXML_AgentBadge(t *testing.T) {
-	xml := formatToastXML("agent-badge", "start", "Agent Started", "claude", "agent-notification", "")
-	if !strings.Contains(xml, "Agent C") {
-		t.Error("agent-badge should include agent initial attribution")
+	if !strings.Contains(xml, `agentnotify-logo.png`) {
+		t.Fatalf("clean toast XML missing logo path: %s", xml)
 	}
 }
 
-func TestFormatToastXML_Compact(t *testing.T) {
-	xml := formatToastXML("compact", "stop", "claude: stop", "claude", "", "")
-	if strings.Contains(xml, "agent-notification") {
-		t.Error("compact should not include project")
-	}
-	if strings.Contains(xml, `placement="hero"`) {
-		t.Error("compact should not use hero image")
-	}
-}
-
-func TestFormatToastXML_CompactIncludesDetails(t *testing.T) {
-	xml := formatToastXML("compact", "stop", "codex: stop", "codex", "CWD: /Users/me/project", "")
-	if !strings.Contains(xml, "<text>CWD: /Users/me/project</text>") {
-		t.Fatalf("compact XML missing workdir details: %s", xml)
+func TestFormatToastXML_UnsupportedStylesCollapseToClean(t *testing.T) {
+	message := "Project: agent-notification | Build completed"
+	styles := []string{"clean", "status-color", "agent-badge", "compact", "custom-card"}
+	for _, style := range styles {
+		t.Run(style, func(t *testing.T) {
+			xml := formatToastXML(style, "start", "Agent Started", message, "claude", "agent-notification", `C:\Temp\agentnotify-logo.png`)
+			for _, want := range []string{
+				`<text hint-style="base" hint-wrap="false">Agent Started</text>`,
+				`<text hint-style="captionSubtle" hint-wrap="true">Project: agent-notification | Build completed</text>`,
+				`placement="appLogoOverride"`,
+				`hint-crop="circle"`,
+			} {
+				if !strings.Contains(xml, want) {
+					t.Fatalf("%s XML missing %q in %s", style, want, xml)
+				}
+			}
+			for _, absent := range []string{`<group>`, `STATUS ·`, `START · Agent Started`, `placement="hero"`} {
+				if strings.Contains(xml, absent) {
+					t.Fatalf("%s XML should not contain %q in %s", style, absent, xml)
+				}
+			}
+		})
 	}
 }
 
 func TestFormatToastXML_EscapesFields(t *testing.T) {
-	xml := formatToastXML("clean", "start", `Agent <Started> & "Ready"`, "claude", "a'b", "")
+	xml := formatToastXML("clean", "start", `Agent <Started> & "Ready"`, "done", "claude", "a'b", "")
 	for _, raw := range []string{`<Started>`, `"Ready"`, "a'b"} {
 		if strings.Contains(xml, raw) {
 			t.Fatalf("xml contains unescaped raw field %q: %s", raw, xml)

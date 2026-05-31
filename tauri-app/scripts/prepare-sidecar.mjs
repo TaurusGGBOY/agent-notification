@@ -36,7 +36,13 @@ if (targetTriple.includes("windows")) {
   env.GOARCH = targetTriple.includes("aarch64") ? "arm64" : "amd64";
 }
 
-execFileSync("go", ["build", "-o", tempPath], {
+const buildArgs = ["build"];
+if (targetTriple.includes("windows")) {
+  buildArgs.push("-ldflags", "-H=windowsgui");
+}
+buildArgs.push("-o", tempPath);
+
+execFileSync("go", buildArgs, {
   cwd: serverDir,
   env,
   stdio: "inherit",

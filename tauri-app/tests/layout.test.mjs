@@ -22,14 +22,23 @@ test("main window uses the 1200x675 logical design size", async () => {
   assert.match(main, /height:\s*675\.0/);
 });
 
-test("toast preview puts event agent and directory in first-glance positions", async () => {
+test("notification surface does not expose style or preview controls", async () => {
   const ui = await readProjectFile("src/ui.ts");
   const styles = await readProjectFile("src/styles.css");
+  const commands = await readProjectFile("src/commands.ts");
+  const api = await readProjectFile("src/api.ts");
 
-  assert.match(ui, /START · Claude/);
-  assert.ok(ui.includes("DIR: /Users/me/project/agent-notification"));
-  assert.doesNotMatch(ui, /Agent 已启动/);
-  assert.match(styles, /\.toast-preview\s+\.state-tag\s*{/);
+  assert.doesNotMatch(ui, /通知样式|通知预览|data-style|previewMarkup|previewText/);
+  assert.doesNotMatch(styles, /style-card|preview-panel|toast-preview|runtime-scale/);
+  assert.doesNotMatch(commands, /styleAliases|styleMatch|labelForStyle|未知样式/);
+  assert.match(api, /export type NotificationStyle = "clean";/);
+});
+
+test("Windows sidecar build uses GUI subsystem", async () => {
+  const prepareSidecar = await readProjectFile("scripts/prepare-sidecar.mjs");
+
+  assert.match(prepareSidecar, /-ldflags/);
+  assert.match(prepareSidecar, /-H=windowsgui/);
 });
 
 test("dashboard exposes a copyable skill install command", async () => {

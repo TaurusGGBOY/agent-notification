@@ -21,7 +21,7 @@ func supportedEvents() []string {
 }
 
 func supportedStyles() []string {
-	return []string{"clean", "status-color", "agent-badge", "compact"}
+	return []string{"clean"}
 }
 
 func localHostname() string {
