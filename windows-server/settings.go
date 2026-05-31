@@ -157,12 +157,8 @@ type SettingsHandler struct {
 }
 
 func NewSettingsHandler() *SettingsHandler {
-	cfgDir := os.Getenv("APPDATA")
-	if cfgDir == "" {
-		cfgDir = filepath.Join(os.Getenv("USERPROFILE"), "AppData", "Roaming")
-	}
 	return &SettingsHandler{
-		configPath: filepath.Join(cfgDir, "AgentNotify", "config.json"),
+		configPath: filepath.Join(configDir(), configFile),
 	}
 }
 
@@ -262,11 +258,7 @@ func (h *ConfigHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 }
 
 func (h *ConfigHandler) getConfigPath() string {
-	cfgDir := os.Getenv("APPDATA")
-	if cfgDir == "" {
-		cfgDir = filepath.Join(os.Getenv("USERPROFILE"), "AppData", "Roaming")
-	}
-	return filepath.Join(cfgDir, "AgentNotify", "config.json")
+	return filepath.Join(configDir(), configFile)
 }
 
 var validStyles = map[string]bool{"clean": true}

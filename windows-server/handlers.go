@@ -118,7 +118,7 @@ func (s *Server) ManifestHandler(w http.ResponseWriter, r *http.Request) {
 		Hostname:        localHostname(),
 		Protocol:        "mdns-dns-sd",
 		ServiceType:     mdnsServiceType + ".local.",
-		Description:     "Windows notification server for agent start/stop events",
+		Description:     "Notification server for agent start/stop events",
 		SupportedEvents: supportedEvents(),
 		SupportedStyles: supportedStyles(),
 	}
