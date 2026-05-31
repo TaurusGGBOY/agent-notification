@@ -122,9 +122,6 @@ jobs:
     runs-on: macos-latest
     env:
       CARGO_BUILD_JOBS: 1
-      APPLE_ID: ${{ secrets.APPLE_ID }}
-      APPLE_PASSWORD: ${{ secrets.APPLE_PASSWORD }}
-      APPLE_TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}
 
     steps:
       - name: Validate release tag
@@ -171,12 +168,18 @@ jobs:
         working-directory: tauri-app
         run: npm ci
 
-      - name: Validate macOS signing secrets
+      - name: Select macOS release signing mode
+        id: macos-signing
         env:
           APPLE_CERTIFICATE: ${{ secrets.APPLE_CERTIFICATE }}
           APPLE_CERTIFICATE_PASSWORD: ${{ secrets.APPLE_CERTIFICATE_PASSWORD }}
+          APPLE_ID: ${{ secrets.APPLE_ID }}
+          APPLE_PASSWORD: ${{ secrets.APPLE_PASSWORD }}
+          APPLE_TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}
           KEYCHAIN_PASSWORD: ${{ secrets.KEYCHAIN_PASSWORD }}
         run: |
+          set -euo pipefail
+
           missing=()
           for name in APPLE_CERTIFICATE APPLE_CERTIFICATE_PASSWORD APPLE_ID APPLE_PASSWORD APPLE_TEAM_ID KEYCHAIN_PASSWORD; do
             if [ -z "${!name:-}" ]; then
@@ -184,13 +187,17 @@ jobs:
             fi
           done
 
-          if [ "${#missing[@]}" -gt 0 ]; then
-            printf 'Missing required macOS signing/notarization secrets: %s\n' "${missing[*]}"
-            printf 'Configure these repository secrets before running a macOS release so the DMG passes Gatekeeper.\n'
-            exit 1
+          if [ "${#missing[@]}" -eq 0 ]; then
+            echo "release_mode=signed" >> "$GITHUB_OUTPUT"
+            echo "Building a Developer ID signed and notarized macOS DMG."
+          else
+            echo "release_mode=unsigned" >> "$GITHUB_OUTPUT"
+            printf 'Missing macOS signing/notarization secrets: %s\n' "${missing[*]}"
+            printf 'Building an unsigned adhoc macOS DMG. Users must right-click Open or allow it in Privacy & Security.\n'
           fi
 
       - name: Import Apple Developer ID certificate
+        if: steps.macos-signing.outputs.release_mode == 'signed'
         env:
           APPLE_CERTIFICATE: ${{ secrets.APPLE_CERTIFICATE }}
           APPLE_CERTIFICATE_PASSWORD: ${{ secrets.APPLE_CERTIFICATE_PASSWORD }}
@@ -226,9 +233,23 @@ jobs:
 
       - name: Build Tauri macOS app
         working-directory: tauri-app
-        run: npm run tauri:build -- --bundles dmg
+        env:
+          MACOS_RELEASE_MODE: ${{ steps.macos-signing.outputs.release_mode }}
+          APPLE_ID: ${{ secrets.APPLE_ID }}
+          APPLE_PASSWORD: ${{ secrets.APPLE_PASSWORD }}
+          APPLE_TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}
+        run: |
+          set -euo pipefail
+
+          if [ "$MACOS_RELEASE_MODE" = "unsigned" ]; then
+            unset APPLE_ID APPLE_PASSWORD APPLE_TEAM_ID
+            export APPLE_SIGNING_IDENTITY="-"
+          fi
+
+          npm run tauri:build -- --bundles dmg
 
       - name: Verify signed and notarized DMG
+        if: steps.macos-signing.outputs.release_mode == 'signed'
         run: |
           set -euo pipefail
 
@@ -258,6 +279,41 @@ jobs:
           codesign --verify --deep --strict --verbose=2 "$app_path"
           spctl --assess --type execute --verbose=4 "$app_path"
 
+      - name: Verify unsigned DMG
+        if: steps.macos-signing.outputs.release_mode == 'unsigned'
+        run: |
+          set -euo pipefail
+
+          dmg_path="$(find tauri-app/src-tauri/target/release/bundle/dmg -type f -name "*.dmg" | head -n 1)"
+          if [ -z "$dmg_path" ]; then
+            echo "No Tauri macOS bundle asset (.dmg) was found"
+            exit 1
+          fi
+
+          hdiutil verify "$dmg_path"
+
+          mount_dir="$(mktemp -d)"
+          cleanup() {
+            hdiutil detach "$mount_dir" >/dev/null 2>&1 || true
+            rmdir "$mount_dir" >/dev/null 2>&1 || true
+          }
+          trap cleanup EXIT
+
+          hdiutil attach "$dmg_path" -readonly -nobrowse -mountpoint "$mount_dir"
+          app_path="$(find "$mount_dir" -maxdepth 1 -type d -name "*.app" | head -n 1)"
+          if [ -z "$app_path" ]; then
+            echo "No app bundle was found inside $dmg_path"
+            exit 1
+          fi
+
+          codesign --verify --deep --strict --verbose=2 "$app_path"
+          if spctl --assess --type execute --verbose=4 "$app_path"; then
+            echo "Unsigned build passed this runner's Gatekeeper assessment."
+            echo "Downloaded copies may still require right-click Open because the app is not notarized."
+          else
+            echo "Unsigned build is expected to be rejected by Gatekeeper until the user manually allows it."
+          fi
+
       - name: Build standalone server binaries
         working-directory: windows-server
         run: |
@@ -265,21 +321,54 @@ jobs:
           GOOS=darwin GOARCH=arm64 go build -o agent-notify-server-darwin-arm64
 
       - name: Collect release assets
+        env:
+          MACOS_RELEASE_MODE: ${{ steps.macos-signing.outputs.release_mode }}
         run: |
+          set -euo pipefail
+
           mkdir -p dist-release
-          find tauri-app/src-tauri/target/release/bundle/dmg -type f -name "*.dmg" -exec cp {} dist-release/ \;
+          dmg_path="$(find tauri-app/src-tauri/target/release/bundle/dmg -type f -name "*.dmg" | head -n 1)"
+          if [ -z "$dmg_path" ]; then
+            echo "No Tauri macOS bundle assets (.dmg) were found"
+            exit 1
+          fi
+          dmg_name="$(basename "$dmg_path")"
+          if [ "$MACOS_RELEASE_MODE" = "unsigned" ]; then
+            dmg_name="${dmg_name%.dmg}-unsigned.dmg"
+          fi
+          cp "$dmg_path" "dist-release/$dmg_name"
+
           if [ -z "$(ls -A dist-release/*.dmg 2>/dev/null)" ]; then
             echo "No Tauri macOS bundle assets (.dmg) were found"
             exit 1
           fi
           cp windows-server/agent-notify-server-darwin-amd64 dist-release/
           cp windows-server/agent-notify-server-darwin-arm64 dist-release/
+          if [ "$MACOS_RELEASE_MODE" = "unsigned" ]; then
+            cat > dist-release/INSTALL-macOS-unsigned.txt <<'EOF'
+          This macOS DMG is unsigned because this project is not currently built with
+          an Apple Developer ID certificate. macOS Gatekeeper will block the first
+          launch after download.
+
+          Install:
+          1. Open the DMG.
+          2. Drag AgentNotify.app to Applications.
+          3. In Applications, right-click AgentNotify.app and choose Open.
+          4. Confirm Open in the macOS security dialog.
+          5. If macOS still blocks it, open System Settings > Privacy & Security and choose Open Anyway.
+
+          A Developer ID signed and notarized build will not need these steps.
+          EOF
+          fi
           shasum -a 256 dist-release/* > dist-release/SHA256SUMS.txt
           ls -la dist-release/
 
       - name: Delete signing keychain
-        if: always() && env.SIGNING_KEYCHAIN != ''
-        run: security delete-keychain "$SIGNING_KEYCHAIN" || true
+        if: always() && steps.macos-signing.outputs.release_mode == 'signed'
+        run: |
+          if [ -n "${SIGNING_KEYCHAIN:-}" ]; then
+            security delete-keychain "$SIGNING_KEYCHAIN" || true
+          fi
 
       - name: Upload workflow artifacts
         uses: actions/upload-artifact@v4
