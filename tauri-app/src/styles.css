@@ -370,14 +370,20 @@ button {
 .dashboard-grid {
   display: grid;
   grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
-  grid-template-rows: minmax(0, auto) minmax(0, 1fr);
+  grid-template-rows: minmax(0, auto) minmax(0, auto) minmax(0, 1fr);
   gap: 12px;
   min-height: 0;
   flex: 1;
 }
 
 .history-card {
-  grid-row: 2;
+  display: flex;
+  flex-direction: column;
+  grid-column: span 2;
+  overflow: hidden;
+}
+
+.install-command-card {
   grid-column: span 2;
 }
 
@@ -392,6 +398,7 @@ button {
 }
 
 .style-card,
+.install-command-card,
 .broadcast-card,
 .actions-card {
   box-shadow: none;
@@ -517,6 +524,47 @@ button {
   border-color: var(--primary);
   background: var(--primary);
   color: #fff;
+}
+
+.command-copy-row {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 10px;
+}
+
+.command-copy-row code {
+  min-width: 0;
+  padding: 12px 14px;
+  overflow-wrap: anywhere;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  background: var(--card-soft);
+  color: var(--text);
+  font-family: "SFMono-Regular", Consolas, "Liberation Mono", monospace;
+  font-size: 14px;
+  line-height: 1.35;
+}
+
+.copy-button {
+  min-width: 86px;
+  min-height: 42px;
+  border: 1px solid var(--primary);
+  border-radius: 8px;
+  background: var(--primary);
+  color: #fff;
+  font-size: 14px;
+  font-weight: 800;
+}
+
+.copy-button.copied {
+  border-color: var(--success);
+  background: var(--success);
+}
+
+.copy-button:disabled {
+  cursor: default;
+  opacity: .82;
 }
 
 .toast-preview {
@@ -706,6 +754,8 @@ button {
 .history-list {
   display: grid;
   gap: 9px;
+  min-height: 0;
+  overflow: auto;
 }
 
 .history-item {
@@ -799,6 +849,15 @@ button {
   }
 
   .dashboard-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .history-card,
+  .install-command-card {
+    grid-column: 1;
+  }
+
+  .command-copy-row {
     grid-template-columns: 1fr;
   }
 }
