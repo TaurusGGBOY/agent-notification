@@ -1,3 +1,6 @@
+import { invoke } from "@tauri-apps/api/core";
+import { isPermissionGranted, requestPermission, sendNotification } from "@tauri-apps/plugin-notification";
+
 const BASE_URL = "http://127.0.0.1:17891";
 
 export type NotificationStyle = "clean" | "status-color" | "agent-badge" | "compact";
@@ -81,8 +84,6 @@ export async function saveConfig(config: AgentConfig): Promise<void> {
   }
 }
 
-import { invoke } from "@tauri-apps/api/core";
-
 export async function restartService(): Promise<void> {
   await invoke("restart_service");
 }
@@ -96,21 +97,50 @@ export async function openWindowsNotificationSettings(): Promise<void> {
 }
 
 export async function sendTestNotification(event: EventName = "start"): Promise<void> {
+  const payload = {
+    agent: "tauri",
+    event,
+    project: "AgentNotify",
+    message: "来自 AgentNotify 的测试通知",
+    timestamp: new Date().toISOString(),
+    sourcePayload: {},
+  };
   const res = await fetch(`${BASE_URL}/notify`, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({
-      agent: "tauri",
-      event,
-      project: "AgentNotify",
-      message: "来自 AgentNotify 的测试通知",
-      timestamp: new Date().toISOString(),
-      sourcePayload: {},
-    }),
+    body: JSON.stringify(payload),
   });
   if (!res.ok) {
     throw new Error(`send test notification failed: ${res.status}`);
   }
+
+  try {
+    const windowsNotifications = await getWindowsNotificationStatus();
+    if (!windowsNotifications.supported) {
+      await sendNativeTestNotification(event);
+    }
+  } catch (err) {
+    console.warn("native test notification failed", err);
+    await sendNativeTestNotification(event);
+  }
+}
+
+export async function sendNativeTestNotification(event: EventName = "start"): Promise<boolean> {
+  let permissionGranted = await isPermissionGranted();
+  if (!permissionGranted) {
+    const permission = await requestPermission();
+    permissionGranted = permission === "granted";
+  }
+
+  if (!permissionGranted) {
+    return false;
+  }
+
+  sendNotification({
+    title: "AgentNotify",
+    body: `${event === "start" ? "启动" : "停止"} · 来自 AgentNotify 的测试通知`,
+  });
+  return true;
 }
 
 async function getJson<T>(path: string): Promise<T> {
