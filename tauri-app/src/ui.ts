@@ -11,6 +11,7 @@ import { applyTheme, getInitialTheme, toggleTheme, type AppTheme } from "./theme
 import { getCurrentWindow } from "@tauri-apps/api/window";
 
 const notificationStyles: NotificationStyle[] = ["clean", "status-color", "agent-badge", "compact"];
+const SKILL_INSTALL_COMMAND = "npx github:TaurusGGBOY/agent-notification";
 let currentTheme: AppTheme = getInitialTheme();
 
 export function render(): void {
@@ -139,6 +140,22 @@ export function render(): void {
             ${previewMarkup(currentStyle)}
           </section>
 
+          <section class="card install-command-card">
+            <div class="card-head">
+              <div class="card-icon green">⌘</div>
+              <div>
+                <h2>安装 skill 命令</h2>
+                <p>在 Agent 环境中运行后安装通知发现 skill</p>
+              </div>
+            </div>
+            <div class="command-copy-row">
+              <code>${escapeHtml(SKILL_INSTALL_COMMAND)}</code>
+              <button class="copy-button" data-action="copy-skill-install-command" type="button" aria-label="复制安装 skill 命令">
+                复制
+              </button>
+            </div>
+          </section>
+
           <section class="card history-card">
             <div class="card-head">
               <div class="card-icon blue">◷</div>
@@ -207,12 +224,54 @@ function bindEvents(): void {
     }
   });
 
+  document.querySelector<HTMLButtonElement>('[data-action="copy-skill-install-command"]')?.addEventListener("click", async (event) => {
+    const button = event.currentTarget as HTMLButtonElement;
+    button.disabled = true;
+    try {
+      await copySkillInstallCommand();
+      button.textContent = "已复制";
+      button.classList.add("copied");
+    } catch {
+      button.textContent = "复制失败";
+      button.classList.remove("copied");
+    }
+    window.setTimeout(() => {
+      button.disabled = false;
+      button.textContent = "复制";
+      button.classList.remove("copied");
+    }, 1400);
+  });
+
   document.querySelectorAll<HTMLElement>("[data-drag-region]").forEach((element) => {
     element.addEventListener("mousedown", (event) => {
       if (event.button !== 0) return;
       void getCurrentWindow().startDragging();
     });
   });
+}
+
+async function copySkillInstallCommand(): Promise<void> {
+  if (navigator.clipboard?.writeText) {
+    await navigator.clipboard.writeText(SKILL_INSTALL_COMMAND);
+    return;
+  }
+
+  const textarea = document.createElement("textarea");
+  textarea.value = SKILL_INSTALL_COMMAND;
+  textarea.setAttribute("readonly", "");
+  textarea.style.position = "fixed";
+  textarea.style.opacity = "0";
+  document.body.appendChild(textarea);
+  textarea.select();
+
+  try {
+    const copied = document.execCommand("copy");
+    if (!copied) {
+      throw new Error("copy command failed");
+    }
+  } finally {
+    textarea.remove();
+  }
 }
 
 function pollWindowsNotificationStatus(): void {

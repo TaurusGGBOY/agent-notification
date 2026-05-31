@@ -1,0 +1,13 @@
+{
+  "name": "agent-notification",
+  "version": "1.0.1",
+  "description": "Install the AgentNotify discovery skill.",
+  "bin": {
+    "agent-notification": "scripts/install-skill.mjs"
+  },
+  "files": [
+    "scripts/install-skill.mjs",
+    "skills/agent-notify-discovery"
+  ],
+  "license": "MIT"
+}
