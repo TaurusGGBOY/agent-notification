@@ -26,7 +26,7 @@ Automate Windows GUI acceptance from macOS/Linux without manual clicks.
    ```bash
    python3 skills/windows-ui-screenshot/scripts/capture_windows_ui.py \
      --host <user>@<host> \
-     --exe 'D:\project\agent-notification\tauri-app\src-tauri\target\release\agent-notify.exe' \
+     --exe 'agent-notification\tauri-app\src-tauri\target\release\agent-notify.exe' \
      --process agent-notify \
      --out /tmp/agentnotify-ui.png
    ```

@@ -476,7 +476,7 @@ Expected: branch pushed.
 On a Windows machine with Go, Node, Rust, and WebView2 build prerequisites:
 
 ```powershell
-cd D:\project\agent-notification\tauri-app
+cd agent-notification\tauri-app
 npm ci
 npm run tauri:build
 ```
@@ -484,13 +484,13 @@ npm run tauri:build
 Expected: Tauri prints a built executable path under:
 
 ```text
-D:\project\agent-notification\tauri-app\src-tauri\target\release\agent-notify.exe
+agent-notification\tauri-app\src-tauri\target\release\agent-notify.exe
 ```
 
 Expected bundles under:
 
 ```text
-D:\project\agent-notification\tauri-app\src-tauri\target\release\bundle
+agent-notification\tauri-app\src-tauri\target\release\bundle
 ```
 
 - [ ] **Step 3: Verify `.exe` starts UI and server**
@@ -498,7 +498,7 @@ D:\project\agent-notification\tauri-app\src-tauri\target\release\bundle
 On Windows:
 
 ```powershell
-cd D:\project\agent-notification
+cd agent-notification
 powershell -NoProfile -ExecutionPolicy Bypass -File scripts\verify-windows-release.ps1 `
   -ExePath .\tauri-app\src-tauri\target\release\agent-notify.exe
 ```

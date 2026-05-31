@@ -1,5 +1,7 @@
 .superpowers/
 .worktrees/
+.playwright-mcp/
+.agents/
 windows-server/*.exe
 windows-server/*.log
 tauri-app/src-tauri/binaries/agent-notify-server-*
