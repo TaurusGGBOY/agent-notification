@@ -153,6 +153,11 @@ class DiscoverTests(unittest.TestCase):
 
         self.assertEqual(listener.snapshot_urls(), ["http://192.168.31.167:17891"])
 
+    def test_manual_url_preserves_explicit_port(self):
+        self.assertEqual(discover.normalize_manual_url("192.168.31.167"), "http://192.168.31.167:17891")
+        self.assertEqual(discover.normalize_manual_url("192.168.31.167:17891"), "http://192.168.31.167:17891")
+        self.assertEqual(discover.normalize_manual_url("http://192.168.31.167:17891/"), "http://192.168.31.167:17891")
+
 
 if __name__ == "__main__":
     unittest.main()

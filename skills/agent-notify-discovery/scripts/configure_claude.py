@@ -99,7 +99,6 @@ def configure_hooks(settings, server_url, agent, events):
     if "stop" in events:
         stop_cmd = command_for(server_url, agent, "stop")
         upsert_event_hook(hooks, "Stop", hook_entry(stop_cmd), "stop", agent)
-        
 
     return settings
 
