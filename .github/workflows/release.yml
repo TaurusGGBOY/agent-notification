@@ -122,6 +122,9 @@ jobs:
     runs-on: macos-latest
     env:
       CARGO_BUILD_JOBS: 1
+      APPLE_ID: ${{ secrets.APPLE_ID }}
+      APPLE_PASSWORD: ${{ secrets.APPLE_PASSWORD }}
+      APPLE_TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}
 
     steps:
       - name: Validate release tag
@@ -168,13 +171,92 @@ jobs:
         working-directory: tauri-app
         run: npm ci
 
+      - name: Validate macOS signing secrets
+        env:
+          APPLE_CERTIFICATE: ${{ secrets.APPLE_CERTIFICATE }}
+          APPLE_CERTIFICATE_PASSWORD: ${{ secrets.APPLE_CERTIFICATE_PASSWORD }}
+          KEYCHAIN_PASSWORD: ${{ secrets.KEYCHAIN_PASSWORD }}
+        run: |
+          missing=()
+          for name in APPLE_CERTIFICATE APPLE_CERTIFICATE_PASSWORD APPLE_ID APPLE_PASSWORD APPLE_TEAM_ID KEYCHAIN_PASSWORD; do
+            if [ -z "${!name:-}" ]; then
+              missing+=("$name")
+            fi
+          done
+
+          if [ "${#missing[@]}" -gt 0 ]; then
+            printf 'Missing required macOS signing/notarization secrets: %s\n' "${missing[*]}"
+            printf 'Configure these repository secrets before running a macOS release so the DMG passes Gatekeeper.\n'
+            exit 1
+          fi
+
+      - name: Import Apple Developer ID certificate
+        env:
+          APPLE_CERTIFICATE: ${{ secrets.APPLE_CERTIFICATE }}
+          APPLE_CERTIFICATE_PASSWORD: ${{ secrets.APPLE_CERTIFICATE_PASSWORD }}
+          KEYCHAIN_PASSWORD: ${{ secrets.KEYCHAIN_PASSWORD }}
+        run: |
+          set -euo pipefail
+
+          certificate_path="$RUNNER_TEMP/apple-developer-id.p12"
+          keychain_path="$RUNNER_TEMP/agentnotify-signing.keychain-db"
+
+          printf '%s' "$APPLE_CERTIFICATE" | base64 --decode > "$certificate_path"
+          security create-keychain -p "$KEYCHAIN_PASSWORD" "$keychain_path"
+          security set-keychain-settings -lut 21600 "$keychain_path"
+          security unlock-keychain -p "$KEYCHAIN_PASSWORD" "$keychain_path"
+          security import "$certificate_path" -P "$APPLE_CERTIFICATE_PASSWORD" -A -t cert -f pkcs12 -k "$keychain_path"
+          security list-keychains -d user -s "$keychain_path"
+          security default-keychain -s "$keychain_path"
+          security set-key-partition-list -S apple-tool:,apple:,codesign: -s -k "$KEYCHAIN_PASSWORD" "$keychain_path"
+          security find-identity -v -p codesigning "$keychain_path"
+
+          cert_id="$(security find-identity -v -p codesigning "$keychain_path" | sed -n 's/.*"\(Developer ID Application:.*\)".*/\1/p' | head -n 1)"
+          if [ -z "$cert_id" ]; then
+            echo "No Developer ID Application signing identity found in the imported certificate."
+            exit 1
+          fi
+
+          echo "APPLE_SIGNING_IDENTITY=$cert_id" >> "$GITHUB_ENV"
+          echo "SIGNING_KEYCHAIN=$keychain_path" >> "$GITHUB_ENV"
+
       - name: Run Go tests
         working-directory: windows-server
         run: go test ./... -v
 
       - name: Build Tauri macOS app
         working-directory: tauri-app
-        run: npm run tauri:build
+        run: npm run tauri:build -- --bundles dmg
+
+      - name: Verify signed and notarized DMG
+        run: |
+          set -euo pipefail
+
+          dmg_path="$(find tauri-app/src-tauri/target/release/bundle/dmg -type f -name "*.dmg" | head -n 1)"
+          if [ -z "$dmg_path" ]; then
+            echo "No Tauri macOS bundle asset (.dmg) was found"
+            exit 1
+          fi
+
+          hdiutil verify "$dmg_path"
+          spctl --assess --type open --context context:primary-signature --verbose=4 "$dmg_path"
+
+          mount_dir="$(mktemp -d)"
+          cleanup() {
+            hdiutil detach "$mount_dir" >/dev/null 2>&1 || true
+            rmdir "$mount_dir" >/dev/null 2>&1 || true
+          }
+          trap cleanup EXIT
+
+          hdiutil attach "$dmg_path" -readonly -nobrowse -mountpoint "$mount_dir"
+          app_path="$(find "$mount_dir" -maxdepth 1 -type d -name "*.app" | head -n 1)"
+          if [ -z "$app_path" ]; then
+            echo "No app bundle was found inside $dmg_path"
+            exit 1
+          fi
+
+          codesign --verify --deep --strict --verbose=2 "$app_path"
+          spctl --assess --type execute --verbose=4 "$app_path"
 
       - name: Build standalone server binaries
         working-directory: windows-server
@@ -185,14 +267,19 @@ jobs:
       - name: Collect release assets
         run: |
           mkdir -p dist-release
-          find tauri-app/src-tauri/target/release/bundle -type f \( -name "*.dmg" -o -name "*.app" \) -exec cp {} dist-release/ \;
+          find tauri-app/src-tauri/target/release/bundle/dmg -type f -name "*.dmg" -exec cp {} dist-release/ \;
           if [ -z "$(ls -A dist-release/*.dmg 2>/dev/null)" ]; then
             echo "No Tauri macOS bundle assets (.dmg) were found"
             exit 1
           fi
           cp windows-server/agent-notify-server-darwin-amd64 dist-release/
           cp windows-server/agent-notify-server-darwin-arm64 dist-release/
+          shasum -a 256 dist-release/* > dist-release/SHA256SUMS.txt
           ls -la dist-release/
+
+      - name: Delete signing keychain
+        if: always() && env.SIGNING_KEYCHAIN != ''
+        run: security delete-keychain "$SIGNING_KEYCHAIN" || true
 
       - name: Upload workflow artifacts
         uses: actions/upload-artifact@v4
