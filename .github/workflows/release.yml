@@ -116,3 +116,95 @@ jobs:
           name: AgentNotify ${{ steps.release.outputs.tag }}
           generate_release_notes: true
           files: dist-release/*
+
+  macos:
+    name: Build macOS release
+    runs-on: macos-latest
+    env:
+      CARGO_BUILD_JOBS: 1
+
+    steps:
+      - name: Validate release tag
+        id: release
+        env:
+          RAW_TAG: ${{ github.event.inputs.tag || github.ref_name }}
+        run: |
+          tag="$RAW_TAG"
+          if [[ ! "$tag" =~ ^v[0-9A-Za-z][0-9A-Za-z._-]*$ ]]; then
+            echo "Release tag must start with v: $tag"
+            exit 1
+          fi
+          echo "tag=$tag" >> "$GITHUB_OUTPUT"
+
+      - name: Checkout tag
+        uses: actions/checkout@v4
+        with:
+          ref: refs/tags/${{ steps.release.outputs.tag }}
+
+      - name: Set up Go
+        uses: actions/setup-go@v5
+        with:
+          go-version-file: windows-server/go.mod
+          cache-dependency-path: windows-server/go.sum
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: tauri-app/package-lock.json
+
+      - name: Set up Rust
+        uses: dtolnay/rust-toolchain@stable
+        with:
+          toolchain: stable
+
+      - name: Cache Rust
+        uses: swatinem/rust-cache@v2
+        with:
+          workspaces: tauri-app/src-tauri
+
+      - name: Install frontend dependencies
+        working-directory: tauri-app
+        run: npm ci
+
+      - name: Run Go tests
+        working-directory: windows-server
+        run: go test ./... -v
+
+      - name: Build Tauri macOS app
+        working-directory: tauri-app
+        run: npm run tauri:build
+
+      - name: Build standalone server binaries
+        working-directory: windows-server
+        run: |
+          GOOS=darwin GOARCH=amd64 go build -o agent-notify-server-darwin-amd64
+          GOOS=darwin GOARCH=arm64 go build -o agent-notify-server-darwin-arm64
+
+      - name: Collect release assets
+        run: |
+          mkdir -p dist-release
+          find tauri-app/src-tauri/target/release/bundle -type f \( -name "*.dmg" -o -name "*.app" \) -exec cp {} dist-release/ \;
+          if [ -z "$(ls -A dist-release/*.dmg 2>/dev/null)" ]; then
+            echo "No Tauri macOS bundle assets (.dmg) were found"
+            exit 1
+          fi
+          cp windows-server/agent-notify-server-darwin-amd64 dist-release/
+          cp windows-server/agent-notify-server-darwin-arm64 dist-release/
+          ls -la dist-release/
+
+      - name: Upload workflow artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: agentnotify-macos
+          path: dist-release/*
+          if-no-files-found: error
+
+      - name: Create GitHub Release
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: ${{ steps.release.outputs.tag }}
+          name: AgentNotify ${{ steps.release.outputs.tag }}
+          generate_release_notes: true
+          files: dist-release/*
