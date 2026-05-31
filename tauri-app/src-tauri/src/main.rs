@@ -43,7 +43,9 @@ fn main() {
         .setup(|app| {
             #[cfg(target_os = "macos")]
             app.set_activation_policy(tauri::ActivationPolicy::Accessory);
-            service::ensure_sidecar(app.handle())?;
+            if let Err(err) = service::ensure_sidecar(app.handle()) {
+                eprintln!("AgentNotify sidecar startup warning: {err}");
+            }
             tray::build_tray(app.handle())?;
             if let Some(window) = app.get_webview_window("main") {
                 let _ = window.set_size(tauri::Size::Logical(tauri::LogicalSize {

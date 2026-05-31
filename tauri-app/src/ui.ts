@@ -21,6 +21,12 @@ export function render(): void {
   const serviceUrl = state.manifest?.url ?? "等待服务地址";
   const version = state.manifest?.version ?? "未知";
   const broadcastEnabled = state.broadcast?.enabled ?? false;
+  const serviceManagedByTauri = state.serviceStatus?.managed_by_tauri !== false;
+  const serviceStatusLabel = state.serviceHealthy
+    ? serviceManagedByTauri
+      ? "在线"
+      : "外部"
+    : "离线";
 
   // 统一通知状态：优先使用当前平台的原生通知
   const macosNotificationsSupported = state.macosNotifications?.supported === true;
@@ -53,7 +59,7 @@ export function render(): void {
         <section class="side-summary">
           <div>
             <span>服务</span>
-            <strong>${state.serviceHealthy ? "在线" : "离线"}</strong>
+            <strong>${serviceStatusLabel}</strong>
           </div>
           <div class="address-row">
             <span>地址</span>
@@ -107,6 +113,11 @@ export function render(): void {
         </header>
 
         ${state.error ? `<section class="notice">${escapeHtml(formatError(state.error))}</section>` : ""}
+        ${
+          state.serviceHealthy && !serviceManagedByTauri
+            ? `<section class="notice">17891 端口由外部 Agent Notify 服务占用，退出客户端不会关闭该服务。</section>`
+            : ""
+        }
 
         <section class="dashboard-grid">
           <section class="card install-command-card">
