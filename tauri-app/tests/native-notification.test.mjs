@@ -23,3 +23,13 @@ test("test notification uses the Tauri native notification plugin", async () => 
   assert.ok(packageJson.dependencies["@tauri-apps/plugin-notification"]);
   assert.match(cargoToml, /tauri-plugin-notification/);
 });
+
+test("macOS notification settings opens this app's notification detail page", async () => {
+  const notificationSettings = await readProjectFile("src-tauri/src/notification_settings.rs");
+  const config = JSON.parse(await readProjectFile("src-tauri/tauri.conf.json"));
+
+  assert.equal(config.identifier, "com.agentnotify.client");
+  assert.match(notificationSettings, /com\.apple\.Notifications-Settings\.extension\?id=/);
+  assert.match(notificationSettings, /com\.agentnotify\.client/);
+  assert.match(notificationSettings, /com\.apple\.preference\.notifications\?id=/);
+});
