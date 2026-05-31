@@ -3,17 +3,76 @@
 package main
 
 /*
-#cgo CFLAGS: -x objective-c -Wno-deprecated-declarations
+#cgo CFLAGS: -x objective-c -fobjc-arc -Wno-deprecated-declarations
 #cgo LDFLAGS: -framework Foundation -framework Cocoa -framework UserNotifications
 #include <stdlib.h>
 #include <stdio.h>
+#include <string.h>
+#import <objc/runtime.h>
 #import <Foundation/Foundation.h>
 #import <Cocoa/Cocoa.h>
 #import <UserNotifications/UserNotifications.h>
 
+@interface NSBundle (AgentNotifyBundleIdentifier)
+- (NSString *)agentnotify_bundleIdentifier;
+@end
+
+@implementation NSBundle (AgentNotifyBundleIdentifier)
+- (NSString *)agentnotify_bundleIdentifier {
+	NSString *identifier = [self agentnotify_bundleIdentifier];
+	if (identifier != nil && [identifier length] > 0) {
+		return identifier;
+	}
+	if (self == [NSBundle mainBundle]) {
+		return @"com.taurusggboy.agent-notification";
+	}
+	return identifier;
+}
+@end
+
+static void agentnotify_ensure_bundle_identifier(void) {
+	if ([[[NSBundle mainBundle] bundleIdentifier] length] > 0) {
+		return;
+	}
+
+	static dispatch_once_t once;
+	dispatch_once(&once, ^{
+		Method original = class_getInstanceMethod([NSBundle class], @selector(bundleIdentifier));
+		Method replacement = class_getInstanceMethod([NSBundle class], @selector(agentnotify_bundleIdentifier));
+		if (original != NULL && replacement != NULL) {
+			method_exchangeImplementations(original, replacement);
+		}
+	});
+}
+
+static NSString *agentnotify_string(const char *value) {
+	if (value == NULL) {
+		return @"";
+	}
+
+	NSString *string = [NSString stringWithUTF8String:value];
+	if (string != nil) {
+		return string;
+	}
+
+	size_t length = strlen(value);
+	string = [[NSString alloc] initWithBytes:value length:length encoding:NSUTF8StringEncoding];
+	if (string != nil) {
+		return string;
+	}
+
+	string = [[NSString alloc] initWithBytes:value length:length encoding:NSISOLatin1StringEncoding];
+	if (string != nil) {
+		return string;
+	}
+
+	return @"";
+}
+
 // Initialize NSApplication as a background accessory (no Dock icon).
 // Must be called once before any notification API usage.
 static void agentnotify_init_app(void) {
+	agentnotify_ensure_bundle_identifier();
 	[NSApplication sharedApplication];
 	[NSApp setActivationPolicy:NSApplicationActivationPolicyAccessory];
 }
@@ -32,18 +91,27 @@ static int agentnotify_deliver_notification(
 
 			// Request authorization (returns immediately if already granted/denied).
 			__block BOOL authorized = NO;
-			__block BOOL authDone = NO;
+			__block NSError *authError = nil;
+			dispatch_semaphore_t authSemaphore = dispatch_semaphore_create(0);
 			[center requestAuthorizationWithOptions:(UNAuthorizationOptionAlert | UNAuthorizationOptionSound)
 				completionHandler:^(BOOL granted, NSError *error) {
 					authorized = granted;
-					authDone = YES;
+					authError = error;
+					dispatch_semaphore_signal(authSemaphore);
 				}];
 
-			// Spin the run loop to process the authorization callback.
-			// On subsequent calls (already authorized/denied), this returns almost instantly.
-			for (int i = 0; i < 100 && !authDone; i++) {
-				[[NSRunLoop currentRunLoop] runUntilDate:
-					[NSDate dateWithTimeIntervalSinceNow:0.05]];
+			if (dispatch_semaphore_wait(authSemaphore, dispatch_time(DISPATCH_TIME_NOW, 5 * NSEC_PER_SEC)) != 0) {
+				if (errbuf != NULL && errbuflen > 0) {
+					snprintf(errbuf, errbuflen, "notification authorization timed out");
+				}
+				return 1;
+			}
+
+			if (authError != nil) {
+				if (errbuf != NULL && errbuflen > 0) {
+					snprintf(errbuf, errbuflen, "%s", [[authError localizedDescription] UTF8String]);
+				}
+				return 1;
 			}
 
 			if (!authorized) {
@@ -55,16 +123,10 @@ static int agentnotify_deliver_notification(
 
 			// Build notification content.
 			UNMutableNotificationContent *content = [[UNMutableNotificationContent alloc] init];
-			content.title = [NSString stringWithUTF8String:title ? title : ""];
-			content.subtitle = [NSString stringWithUTF8String:subtitle ? subtitle : ""];
-			content.body = [NSString stringWithUTF8String:body ? body : ""];
-
-			NSString *soundName = [NSString stringWithUTF8String:sound ? sound : ""];
-			if ([soundName length] > 0) {
-				content.sound = [UNNotificationSound soundNamed:soundName];
-			} else {
-				content.sound = [UNNotificationSound defaultSound];
-			}
+			content.title = agentnotify_string(title);
+			content.subtitle = agentnotify_string(subtitle);
+			content.body = agentnotify_string(body);
+			content.sound = [UNNotificationSound defaultSound];
 
 			// Create an immediate trigger (timeInterval must be > 0).
 			UNTimeIntervalNotificationTrigger *trigger =
@@ -75,17 +137,18 @@ static int agentnotify_deliver_notification(
 				content:content trigger:trigger];
 
 			// Synchronously add the notification request.
-			__block BOOL addDone = NO;
 			__block NSError *addError = nil;
+			dispatch_semaphore_t addSemaphore = dispatch_semaphore_create(0);
 			[center addNotificationRequest:request withCompletionHandler:^(NSError *error) {
 				addError = error;
-				addDone = YES;
+				dispatch_semaphore_signal(addSemaphore);
 			}];
 
-			// Spin the run loop to process the add-notification callback.
-			for (int i = 0; i < 60 && !addDone; i++) {
-				[[NSRunLoop currentRunLoop] runUntilDate:
-					[NSDate dateWithTimeIntervalSinceNow:0.05]];
+			if (dispatch_semaphore_wait(addSemaphore, dispatch_time(DISPATCH_TIME_NOW, 3 * NSEC_PER_SEC)) != 0) {
+				if (errbuf != NULL && errbuflen > 0) {
+					snprintf(errbuf, errbuflen, "notification delivery timed out");
+				}
+				return 1;
 			}
 
 			if (addError != nil) {
