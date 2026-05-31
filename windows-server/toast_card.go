@@ -40,11 +40,20 @@ func toastAppLogoPath() (string, error) {
 }
 
 func toastAssetPath(fileName string) (string, error) {
-	base := os.Getenv("LOCALAPPDATA")
-	if base == "" {
-		base = filepath.Join(os.TempDir(), "AgentNotify")
+	var base string
+	if runtime.GOOS == "darwin" {
+		if home, err := os.UserHomeDir(); err == nil {
+			base = filepath.Join(home, "Library", "Caches", "AgentNotify")
+		} else {
+			base = filepath.Join(os.TempDir(), "AgentNotify")
+		}
 	} else {
-		base = filepath.Join(base, "AgentNotify")
+		base = os.Getenv("LOCALAPPDATA")
+		if base == "" {
+			base = filepath.Join(os.TempDir(), "AgentNotify")
+		} else {
+			base = filepath.Join(base, "AgentNotify")
+		}
 	}
 	if err := os.MkdirAll(base, 0755); err != nil {
 		return "", err
@@ -54,12 +63,21 @@ func toastAssetPath(fileName string) (string, error) {
 
 func loadTTFFont(sizePt float64) (font.Face, error) {
 	var fontPaths []string
-	if runtime.GOOS == "windows" {
+	switch runtime.GOOS {
+	case "windows":
 		fontPaths = []string{
 			`C:\Windows\Fonts\segoeui.ttf`,
 			`C:\Windows\Fonts\seguisb.ttf`,
 			`C:\Windows\Fonts\consola.ttf`,
 			`C:\Windows\Fonts\lucon.ttf`,
+		}
+	case "darwin":
+		fontPaths = []string{
+			"/System/Library/Fonts/SFNS.ttf",
+			"/System/Library/Fonts/SFNSText.ttf",
+			"/Library/Fonts/Helvetica.ttc",
+			"/System/Library/Fonts/Supplemental/Arial.ttf",
+			"/System/Library/Fonts/Supplemental/HelveticaNeue.ttc",
 		}
 	}
 	for _, path := range fontPaths {

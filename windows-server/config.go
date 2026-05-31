@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"os"
 	"path/filepath"
+	"runtime"
 )
 
 const (
@@ -12,6 +13,21 @@ const (
 	configFile    = "config.json"
 )
 
+// configDir returns the platform-appropriate config directory for AgentNotify.
+func configDir() string {
+	if runtime.GOOS == "darwin" {
+		if home, err := os.UserHomeDir(); err == nil {
+			return filepath.Join(home, "Library", "Application Support", appName)
+		}
+	}
+	// Windows: %APPDATA%\AgentNotify
+	dir := os.Getenv(configPathEnv)
+	if dir == "" {
+		dir = filepath.Join(os.Getenv("USERPROFILE"), "AppData", "Roaming")
+	}
+	return filepath.Join(dir, appName)
+}
+
 type Config struct {
 	NotificationStyle string            `json:"notificationStyle"`
 	EnabledEvents     []string          `json:"enabledEvents"`
@@ -19,12 +35,7 @@ type Config struct {
 }
 
 func LoadConfig() (*Config, error) {
-	configDir := os.Getenv(configPathEnv)
-	if configDir == "" {
-		configDir = filepath.Join(os.Getenv("USERPROFILE"), "AppData", "Roaming")
-	}
-
-	configPath := filepath.Join(configDir, appName, configFile)
+	configPath := filepath.Join(configDir(), configFile)
 
 	data, err := os.ReadFile(configPath)
 	if err != nil {

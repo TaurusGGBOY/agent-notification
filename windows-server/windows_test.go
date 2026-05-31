@@ -7,6 +7,7 @@ import (
 	"net/http/httptest"
 	"os"
 	"path/filepath"
+	"runtime"
 	"strings"
 	"testing"
 )
@@ -581,14 +582,20 @@ func TestSettingsHandler_GET(t *testing.T) {
 }
 
 func TestSettingsHandler_POST_SaveConfig(t *testing.T) {
-	// Create temp config dir
 	tmpDir := t.TempDir()
-	configDir := filepath.Join(tmpDir, "AgentNotify")
-	os.MkdirAll(configDir, 0755)
+	var configPath string
 
-	oldAppData := os.Getenv("APPDATA")
-	os.Setenv("APPDATA", tmpDir)
-	defer os.Setenv("APPDATA", oldAppData)
+	if runtime.GOOS == "darwin" {
+		oldHome := os.Getenv("HOME")
+		os.Setenv("HOME", tmpDir)
+		defer os.Setenv("HOME", oldHome)
+		configPath = filepath.Join(tmpDir, "Library", "Application Support", "AgentNotify", "config.json")
+	} else {
+		oldAppData := os.Getenv("APPDATA")
+		os.Setenv("APPDATA", tmpDir)
+		defer os.Setenv("APPDATA", oldAppData)
+		configPath = filepath.Join(tmpDir, "AgentNotify", "config.json")
+	}
 
 	handler := NewSettingsHandler()
 
@@ -603,7 +610,6 @@ func TestSettingsHandler_POST_SaveConfig(t *testing.T) {
 	}
 
 	// Verify config file was written
-	configPath := filepath.Join(tmpDir, "AgentNotify", "config.json")
 	data, err := os.ReadFile(configPath)
 	if err != nil {
 		t.Fatalf("failed to read config: %v", err)
@@ -695,9 +701,16 @@ func TestIsValidEvent(t *testing.T) {
 
 func TestSettingsHandler_SaveLoadRoundTrip(t *testing.T) {
 	tmpDir := t.TempDir()
-	oldAppData := os.Getenv("APPDATA")
-	os.Setenv("APPDATA", tmpDir)
-	defer os.Setenv("APPDATA", oldAppData)
+
+	if runtime.GOOS == "darwin" {
+		oldHome := os.Getenv("HOME")
+		os.Setenv("HOME", tmpDir)
+		defer os.Setenv("HOME", oldHome)
+	} else {
+		oldAppData := os.Getenv("APPDATA")
+		os.Setenv("APPDATA", tmpDir)
+		defer os.Setenv("APPDATA", oldAppData)
+	}
 
 	handler := NewSettingsHandler()
 
@@ -837,9 +850,19 @@ func TestBroadcastHandler_GetAndInvalidPost(t *testing.T) {
 
 func TestSettingsHandler_InvalidStyleNotSaved(t *testing.T) {
 	tmpDir := t.TempDir()
-	oldAppData := os.Getenv("APPDATA")
-	os.Setenv("APPDATA", tmpDir)
-	defer os.Setenv("APPDATA", oldAppData)
+	var configPath string
+
+	if runtime.GOOS == "darwin" {
+		oldHome := os.Getenv("HOME")
+		os.Setenv("HOME", tmpDir)
+		defer os.Setenv("HOME", oldHome)
+		configPath = filepath.Join(tmpDir, "Library", "Application Support", "AgentNotify", "config.json")
+	} else {
+		oldAppData := os.Getenv("APPDATA")
+		os.Setenv("APPDATA", tmpDir)
+		defer os.Setenv("APPDATA", oldAppData)
+		configPath = filepath.Join(tmpDir, "AgentNotify", "config.json")
+	}
 
 	handler := NewSettingsHandler()
 
@@ -854,7 +877,6 @@ func TestSettingsHandler_InvalidStyleNotSaved(t *testing.T) {
 	}
 
 	// Verify config should use default style, not invalid style
-	configPath := filepath.Join(tmpDir, "AgentNotify", "config.json")
 	data, err := os.ReadFile(configPath)
 	if err != nil {
 		t.Fatalf("failed to read config: %v", err)
@@ -873,9 +895,19 @@ func TestSettingsHandler_InvalidStyleNotSaved(t *testing.T) {
 
 func TestSettingsHandler_InvalidEventNotSaved(t *testing.T) {
 	tmpDir := t.TempDir()
-	oldAppData := os.Getenv("APPDATA")
-	os.Setenv("APPDATA", tmpDir)
-	defer os.Setenv("APPDATA", oldAppData)
+	var configPath string
+
+	if runtime.GOOS == "darwin" {
+		oldHome := os.Getenv("HOME")
+		os.Setenv("HOME", tmpDir)
+		defer os.Setenv("HOME", oldHome)
+		configPath = filepath.Join(tmpDir, "Library", "Application Support", "AgentNotify", "config.json")
+	} else {
+		oldAppData := os.Getenv("APPDATA")
+		os.Setenv("APPDATA", tmpDir)
+		defer os.Setenv("APPDATA", oldAppData)
+		configPath = filepath.Join(tmpDir, "AgentNotify", "config.json")
+	}
 
 	handler := NewSettingsHandler()
 
@@ -890,7 +922,6 @@ func TestSettingsHandler_InvalidEventNotSaved(t *testing.T) {
 	}
 
 	// Verify only valid events were saved
-	configPath := filepath.Join(tmpDir, "AgentNotify", "config.json")
 	data, err := os.ReadFile(configPath)
 	if err != nil {
 		t.Fatalf("failed to read config: %v", err)

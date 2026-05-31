@@ -9,51 +9,76 @@ import (
 	"net/http/httptest"
 	"os"
 	"path/filepath"
+	"runtime"
 	"strings"
 	"testing"
 )
 
 func TestToastCardPathUsesLocalAppDataAndFallback(t *testing.T) {
-	oldLocalAppData := os.Getenv("LOCALAPPDATA")
-	defer os.Setenv("LOCALAPPDATA", oldLocalAppData)
-
 	tmpDir := t.TempDir()
-	os.Setenv("LOCALAPPDATA", tmpDir)
 
-	path, err := toastCardPath()
-	if err != nil {
-		t.Fatalf("toastCardPath with LOCALAPPDATA failed: %v", err)
-	}
-	want := filepath.Join(tmpDir, "AgentNotify", "toast-card.png")
-	if path != want {
-		t.Fatalf("path = %q, want %q", path, want)
-	}
-	if _, err := os.Stat(filepath.Dir(path)); err != nil {
-		t.Fatalf("expected directory to exist: %v", err)
-	}
+	if runtime.GOOS == "darwin" {
+		oldHome := os.Getenv("HOME")
+		os.Setenv("HOME", tmpDir)
+		defer os.Setenv("HOME", oldHome)
 
-	os.Setenv("LOCALAPPDATA", "")
-	path, err = toastCardPath()
-	if err != nil {
-		t.Fatalf("toastCardPath fallback failed: %v", err)
-	}
-	if !strings.HasSuffix(path, filepath.Join("AgentNotify", "toast-card.png")) {
-		t.Fatalf("fallback path = %q, want AgentNotify toast card suffix", path)
+		path, err := toastCardPath()
+		if err != nil {
+			t.Fatalf("toastCardPath failed: %v", err)
+		}
+		want := filepath.Join(tmpDir, "Library", "Caches", "AgentNotify", "toast-card.png")
+		if path != want {
+			t.Fatalf("path = %q, want %q", path, want)
+		}
+	} else {
+		oldLocalAppData := os.Getenv("LOCALAPPDATA")
+		defer os.Setenv("LOCALAPPDATA", oldLocalAppData)
+		os.Setenv("LOCALAPPDATA", tmpDir)
+
+		path, err := toastCardPath()
+		if err != nil {
+			t.Fatalf("toastCardPath with LOCALAPPDATA failed: %v", err)
+		}
+		want := filepath.Join(tmpDir, "AgentNotify", "toast-card.png")
+		if path != want {
+			t.Fatalf("path = %q, want %q", path, want)
+		}
+		if _, err := os.Stat(filepath.Dir(path)); err != nil {
+			t.Fatalf("expected directory to exist: %v", err)
+		}
+
+		os.Setenv("LOCALAPPDATA", "")
+		path, err = toastCardPath()
+		if err != nil {
+			t.Fatalf("toastCardPath fallback failed: %v", err)
+		}
+		if !strings.HasSuffix(path, filepath.Join("AgentNotify", "toast-card.png")) {
+			t.Fatalf("fallback path = %q, want AgentNotify toast card suffix", path)
+		}
 	}
 }
 
 func TestToastAppLogoPathAndRenderWritesPNG(t *testing.T) {
-	oldLocalAppData := os.Getenv("LOCALAPPDATA")
-	defer os.Setenv("LOCALAPPDATA", oldLocalAppData)
-
 	tmpDir := t.TempDir()
-	os.Setenv("LOCALAPPDATA", tmpDir)
+	var logoDir string
+
+	if runtime.GOOS == "darwin" {
+		oldHome := os.Getenv("HOME")
+		os.Setenv("HOME", tmpDir)
+		defer os.Setenv("HOME", oldHome)
+		logoDir = filepath.Join(tmpDir, "Library", "Caches", "AgentNotify")
+	} else {
+		oldLocalAppData := os.Getenv("LOCALAPPDATA")
+		defer os.Setenv("LOCALAPPDATA", oldLocalAppData)
+		os.Setenv("LOCALAPPDATA", tmpDir)
+		logoDir = filepath.Join(tmpDir, "AgentNotify")
+	}
 
 	path, err := toastAppLogoPath()
 	if err != nil {
 		t.Fatalf("toastAppLogoPath failed: %v", err)
 	}
-	if want := filepath.Join(tmpDir, "AgentNotify", "app-logo.png"); path != want {
+	if want := filepath.Join(logoDir, "app-logo.png"); path != want {
 		t.Fatalf("logo path = %q, want %q", path, want)
 	}
 
@@ -340,12 +365,20 @@ func TestHistoryHandlerEmptyAndRecordHistoryDefaultsAgent(t *testing.T) {
 
 func TestCurrentConfigFallsBackToCachedConfigOnLoadError(t *testing.T) {
 	tmpDir := t.TempDir()
-	t.Setenv("APPDATA", tmpDir)
-	configDir := filepath.Join(tmpDir, "AgentNotify")
-	if err := os.MkdirAll(configDir, 0755); err != nil {
+	var cfgDir string
+	if runtime.GOOS == "darwin" {
+		oldHome := os.Getenv("HOME")
+		os.Setenv("HOME", tmpDir)
+		defer os.Setenv("HOME", oldHome)
+		cfgDir = filepath.Join(tmpDir, "Library", "Application Support", "AgentNotify")
+	} else {
+		t.Setenv("APPDATA", tmpDir)
+		cfgDir = filepath.Join(tmpDir, "AgentNotify")
+	}
+	if err := os.MkdirAll(cfgDir, 0755); err != nil {
 		t.Fatalf("mkdir config dir failed: %v", err)
 	}
-	if err := os.WriteFile(filepath.Join(configDir, "config.json"), []byte(`{bad json`), 0644); err != nil {
+	if err := os.WriteFile(filepath.Join(cfgDir, "config.json"), []byte(`{bad json`), 0644); err != nil {
 		t.Fatalf("write invalid config failed: %v", err)
 	}
 
@@ -486,14 +519,23 @@ func TestSettingsHandlerInvalidJSONAndDirectoryFailure(t *testing.T) {
 }
 
 func TestConfigHandlerWrongMethodAndFallbackPath(t *testing.T) {
-	oldAppData := os.Getenv("APPDATA")
-	oldUserProfile := os.Getenv("USERPROFILE")
-	defer os.Setenv("APPDATA", oldAppData)
-	defer os.Setenv("USERPROFILE", oldUserProfile)
-
-	os.Setenv("APPDATA", "")
 	tmpDir := t.TempDir()
-	os.Setenv("USERPROFILE", tmpDir)
+	var wantPath string
+
+	if runtime.GOOS == "darwin" {
+		oldHome := os.Getenv("HOME")
+		os.Setenv("HOME", tmpDir)
+		defer os.Setenv("HOME", oldHome)
+		wantPath = filepath.Join(tmpDir, "Library", "Application Support", "AgentNotify", "config.json")
+	} else {
+		oldAppData := os.Getenv("APPDATA")
+		oldUserProfile := os.Getenv("USERPROFILE")
+		defer os.Setenv("APPDATA", oldAppData)
+		defer os.Setenv("USERPROFILE", oldUserProfile)
+		os.Setenv("APPDATA", "")
+		os.Setenv("USERPROFILE", tmpDir)
+		wantPath = filepath.Join(tmpDir, "AppData", "Roaming", "AgentNotify", "config.json")
+	}
 
 	handler := &ConfigHandler{}
 	req := httptest.NewRequest(http.MethodPost, "/config", nil)
@@ -514,7 +556,6 @@ func TestConfigHandlerWrongMethodAndFallbackPath(t *testing.T) {
 	if err := json.NewDecoder(w.Body).Decode(&resp); err != nil {
 		t.Fatalf("decode config response failed: %v", err)
 	}
-	wantPath := filepath.Join(tmpDir, "AppData", "Roaming", "AgentNotify", "config.json")
 	if resp["_path"] != wantPath {
 		t.Fatalf("config path = %q, want %q", resp["_path"], wantPath)
 	}
@@ -522,12 +563,20 @@ func TestConfigHandlerWrongMethodAndFallbackPath(t *testing.T) {
 
 func TestLoadConfigInvalidJSONReturnsError(t *testing.T) {
 	tmpDir := t.TempDir()
-	t.Setenv("APPDATA", tmpDir)
-	configDir := filepath.Join(tmpDir, "AgentNotify")
-	if err := os.MkdirAll(configDir, 0755); err != nil {
+	var cfgDir string
+	if runtime.GOOS == "darwin" {
+		oldHome := os.Getenv("HOME")
+		os.Setenv("HOME", tmpDir)
+		defer os.Setenv("HOME", oldHome)
+		cfgDir = filepath.Join(tmpDir, "Library", "Application Support", "AgentNotify")
+	} else {
+		t.Setenv("APPDATA", tmpDir)
+		cfgDir = filepath.Join(tmpDir, "AgentNotify")
+	}
+	if err := os.MkdirAll(cfgDir, 0755); err != nil {
 		t.Fatalf("mkdir config dir failed: %v", err)
 	}
-	if err := os.WriteFile(filepath.Join(configDir, "config.json"), []byte(`{bad json`), 0644); err != nil {
+	if err := os.WriteFile(filepath.Join(cfgDir, "config.json"), []byte(`{bad json`), 0644); err != nil {
 		t.Fatalf("write invalid config failed: %v", err)
 	}
 
