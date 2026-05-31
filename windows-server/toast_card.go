@@ -121,7 +121,7 @@ func renderToastCard(path string, card ToastCard) error {
 		drawTextWithFace(img, scale(44), scale(94), truncateText(eventAgent, 32), color.RGBA{R: 248, G: 250, B: 252, A: 255}, basicfont.Face7x13)
 	}
 
-	cardDirectory := "DIR: " + compactDirectoryForDisplay(directory, 31)
+	cardDirectory := "DIR: " + lastFolderName(directory)
 	if face, err := loadTTFFont(42); err == nil {
 		drawTextWithFace(img, scale(44), scale(128), truncateText(cardDirectory, 36), color.RGBA{R: 226, G: 232, B: 240, A: 255}, face)
 	} else {
@@ -237,6 +237,26 @@ func toastCardSummaryLines(card ToastCard) (string, string, string) {
 		detail = strings.TrimSpace(card.Message)
 	}
 	return eventAgent, directory, detail
+}
+
+func lastFolderName(path string) string {
+	path = strings.TrimSpace(path)
+	if path == "" {
+		return "unknown"
+	}
+	sep := "/"
+	if strings.Contains(path, `\`) && !strings.Contains(path, "/") {
+		sep = `\`
+	}
+	parts := strings.Split(path, sep)
+	// Remove empty parts from trailing separator
+	for len(parts) > 0 && parts[len(parts)-1] == "" {
+		parts = parts[:len(parts)-1]
+	}
+	if len(parts) == 0 {
+		return "unknown"
+	}
+	return parts[len(parts)-1]
 }
 
 func compactDirectoryForDisplay(path string, max int) string {
