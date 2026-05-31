@@ -171,16 +171,18 @@ function bindEvents(): void {
   });
 
   document.querySelector<HTMLButtonElement>('[data-action="native-notifications"]')?.addEventListener("click", async () => {
-    if (!nativeNotificationsSupported) return;
+    const isMacos = state.macosNotifications?.supported === true;
+    const isWindows = state.windowsNotifications?.supported === true;
+    if (!isMacos && !isWindows) return;
     try {
-      if (macosNotificationsSupported) {
+      if (isMacos) {
         await openMacosNotificationSettings();
-      } else if (windowsNotificationsSupported) {
+      } else if (isWindows) {
         await openWindowsNotificationSettings();
       }
       pollNativeNotificationStatus();
     } catch (err) {
-      if (macosNotificationsSupported) {
+      if (isMacos) {
         state.macosNotificationError = err instanceof Error ? err.message : String(err);
       } else {
         state.windowsNotificationError = err instanceof Error ? err.message : String(err);
