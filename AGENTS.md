@@ -1,15 +1,9 @@
-@/Users/gaoguobin/.codex/RTK.md
-
-@/Users/gaoguobin/.codex/skills/caveman/SKILL.md
-
-Default response mode: caveman full.
-Use caveman mode from session start unless user says "stop caveman" or "normal mode".
-
 ## Repository Workflow
 
-- Use git worktrees for feature work. Keep the repository root worktree on `main` long-term.
-- Create one feature branch per task in its own worktree.
-- Do development and verification inside the feature worktree.
+- Keep the repository root worktree on `main` long-term; use it only for syncing, inspection, and worktree management.
+- Do not modify project files in the repository root worktree for normal tasks.
+- For every code or documentation change, create one feature branch per task in its own worktree.
+- Do development and verification inside the feature worktree only.
 - Push the feature branch and open a PR into `main`.
 - Review the PR. Apply requested changes in the same feature branch, push again, and repeat until review has no blocking issues.
 - Keep the branch rebased on latest `main` before final merge.
