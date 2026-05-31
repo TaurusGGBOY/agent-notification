@@ -1,62 +1,105 @@
-//go:build darwin
+//go:build darwin && cgo
 
 package main
 
+/*
+#cgo CFLAGS: -x objective-c -Wno-deprecated-declarations
+#cgo LDFLAGS: -framework Foundation -framework Cocoa
+#include <stdlib.h>
+#include <stdio.h>
+#import <Foundation/Foundation.h>
+#import <Cocoa/Cocoa.h>
+
+@interface AgentNotifyNotificationDelegate : NSObject <NSUserNotificationCenterDelegate>
+@end
+
+@implementation AgentNotifyNotificationDelegate
+- (BOOL)userNotificationCenter:(NSUserNotificationCenter *)center shouldPresentNotification:(NSUserNotification *)notification {
+	return YES;
+}
+@end
+
+static NSString *agentnotify_string(const char *value) {
+	if (value == NULL) {
+		return @"";
+	}
+	NSString *string = [NSString stringWithUTF8String:value];
+	if (string == nil) {
+		return @"";
+	}
+	return string;
+}
+
+static int agentnotify_deliver_notification(
+	const char *title,
+	const char *subtitle,
+	const char *body,
+	const char *sound,
+	char *errbuf,
+	int errbuflen
+) {
+	@autoreleasepool {
+		@try {
+			NSUserNotification *notification = [[NSUserNotification alloc] init];
+			notification.title = agentnotify_string(title);
+			notification.subtitle = agentnotify_string(subtitle);
+			notification.informativeText = agentnotify_string(body);
+			NSString *soundName = agentnotify_string(sound);
+			if ([soundName length] > 0) {
+				notification.soundName = soundName;
+			} else {
+				notification.soundName = NSUserNotificationDefaultSoundName;
+			}
+
+			NSUserNotificationCenter *center = [NSUserNotificationCenter defaultUserNotificationCenter];
+			AgentNotifyNotificationDelegate *delegate = [[AgentNotifyNotificationDelegate alloc] init];
+			center.delegate = delegate;
+			[center deliverNotification:notification];
+			[NSThread sleepForTimeInterval:0.8];
+			return 0;
+		} @catch (NSException *exception) {
+			if (errbuf != NULL && errbuflen > 0) {
+				snprintf(errbuf, errbuflen, "%s", [[exception reason] UTF8String]);
+			}
+			return 1;
+		}
+	}
+}
+*/
+import "C"
+
 import (
 	"fmt"
-	"log"
-	"os/exec"
 	"strings"
+	"unsafe"
 )
 
-// ToastNotifier sends native macOS notifications via osascript.
-type ToastNotifier struct {
-	appName string
-}
+func deliverDarwinNotification(req darwinNotificationRequest) error {
+	title := C.CString(req.Title)
+	subtitle := C.CString(req.Subtitle)
+	body := C.CString(req.Body)
+	sound := C.CString(req.Sound)
+	errbuf := C.malloc(512)
+	defer C.free(unsafe.Pointer(title))
+	defer C.free(unsafe.Pointer(subtitle))
+	defer C.free(unsafe.Pointer(body))
+	defer C.free(unsafe.Pointer(sound))
+	defer C.free(errbuf)
 
-func NewToastNotifier(appName string) *ToastNotifier {
-	return &ToastNotifier{appName: appName}
-}
-
-func (n *ToastNotifier) Notify(title, message string) error {
-	return n.NotifyWithStyle("clean", "stop", title, message, "")
-}
-
-func (n *ToastNotifier) NotifyWithStyle(style, event, title, message, agent string) error {
-	sound := "Glass"
-	if event == "start" {
-		sound = "Hero"
-	}
-
-	// osascript display notification: title = event label, subtitle = agent, body = message
-	subtitle := strings.TrimSpace(agent)
-	if subtitle == "" {
-		subtitle = n.appName
-	}
-
-	script := fmt.Sprintf(
-		`display notification %s with title %s subtitle %s sound name %q`,
-		appleScriptQuote(message),
-		appleScriptQuote(title),
-		appleScriptQuote(subtitle),
+	result := C.agentnotify_deliver_notification(
+		title,
+		subtitle,
+		body,
 		sound,
+		(*C.char)(errbuf),
+		512,
 	)
-
-	log.Printf("sending macOS notification: title=%q subtitle=%q", title, subtitle)
-	cmd := exec.Command("osascript", "-e", script)
-	output, err := cmd.CombinedOutput()
-	if err != nil {
-		log.Printf("osascript failed: %v, output: %s", err, string(output))
-		return fmt.Errorf("osascript: %w", err)
+	if result != 0 {
+		msg := C.GoString((*C.char)(errbuf))
+		if strings.TrimSpace(msg) == "" {
+			msg = "unknown native notification error"
+		}
+		return fmt.Errorf("native macOS notification: %s", msg)
 	}
-	log.Printf("macOS notification sent successfully")
 	return nil
-}
-
-// appleScriptQuote wraps a string in double quotes for AppleScript,
-// escaping any embedded double quotes and backslashes.
-func appleScriptQuote(s string) string {
-	s = strings.ReplaceAll(s, `\`, `\\`)
-	s = strings.ReplaceAll(s, `"`, `\"`)
-	return `"` + s + `"`
 }
