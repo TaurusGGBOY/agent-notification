@@ -29,7 +29,7 @@ class ConfigureCodexTests(unittest.TestCase):
             }
         }
 
-        configure_codex.configure_hooks(settings, "http://192.168.31.167:17891", "codex", ["start", "stop"])
+        configure_codex.configure_hooks(settings, "http://localhost:17891", "codex", ["start", "stop"])
 
         session_hooks = settings["hooks"]["SessionStart"][0]["hooks"]
         self.assertEqual(settings["hooks"]["SessionStart"][0]["matcher"], "startup|resume")

@@ -259,64 +259,6 @@ func lastFolderName(path string) string {
 	return parts[len(parts)-1]
 }
 
-func compactDirectoryForDisplay(path string, max int) string {
-	path = strings.TrimSpace(path)
-	if max <= 0 || len([]rune(path)) <= max {
-		return path
-	}
-
-	sep := "/"
-	if strings.Contains(path, `\`) && !strings.Contains(path, "/") {
-		sep = `\`
-	}
-	parts := strings.Split(path, sep)
-	if len(parts) < 4 {
-		return truncateTail(path, max)
-	}
-
-	headCount := 2
-	if sep == "/" && parts[0] == "" {
-		headCount = 3
-	}
-	if sep == `\` && strings.HasSuffix(parts[0], ":") {
-		headCount = 3
-	}
-	if len(parts) <= headCount+2 {
-		return truncateTail(path, max)
-	}
-
-	head := strings.Join(parts[:headCount], sep)
-	for _, tailCount := range []int{3, 2, 1} {
-		if len(parts) <= headCount+tailCount {
-			continue
-		}
-		tail := strings.Join(parts[len(parts)-tailCount:], sep)
-		candidate := head + sep + "..." + sep + tail
-		if len([]rune(candidate)) <= max {
-			return candidate
-		}
-	}
-	for _, tailCount := range []int{3, 2, 1} {
-		tail := strings.Join(parts[len(parts)-tailCount:], sep)
-		candidate := "..." + sep + tail
-		if len([]rune(candidate)) <= max {
-			return candidate
-		}
-	}
-	return truncateTail(path, max)
-}
-
-func truncateTail(s string, max int) string {
-	runes := []rune(strings.TrimSpace(s))
-	if len(runes) <= max {
-		return string(runes)
-	}
-	if max <= 3 {
-		return string(runes[len(runes)-max:])
-	}
-	return "..." + string(runes[len(runes)-(max-3):])
-}
-
 func truncateText(s string, max int) string {
 	runes := []rune(strings.TrimSpace(s))
 	if len(runes) <= max {

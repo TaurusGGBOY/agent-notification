@@ -244,8 +244,8 @@ func TestNotifyHandler_UsesWorkdirAliasInMessage(t *testing.T) {
 	if len(notifier.calls) != 1 {
 		t.Fatalf("expected 1 notification, got %d", len(notifier.calls))
 	}
-	if !strings.Contains(notifier.calls[0].message, "/Users/me/project") {
-		t.Fatalf("message = %q, want workdir path", notifier.calls[0].message)
+	if !strings.Contains(notifier.calls[0].message, "DIR: project") {
+		t.Fatalf("message = %q, want workdir folder name", notifier.calls[0].message)
 	}
 }
 
@@ -354,7 +354,7 @@ func TestFormatMessage(t *testing.T) {
 		{
 			name:     "with cwd",
 			payload:  NotifyPayload{Cwd: "~/code"},
-			contains: "DIR: ~/code",
+			contains: "DIR: code",
 		},
 		{
 			name:     "with message",
@@ -391,7 +391,7 @@ func TestFormatMessage_MultipleFields(t *testing.T) {
 	}
 
 	got := formatMessage(payload)
-	want := "DIR: /home/user | PROJECT: test-project | test message"
+	want := "DIR: user | PROJECT: test-project | test message"
 	if got != want {
 		t.Fatalf("formatMessage() = %q, want %q", got, want)
 	}
@@ -399,8 +399,8 @@ func TestFormatMessage_MultipleFields(t *testing.T) {
 	if !bytes.Contains([]byte(got), []byte("test-project")) {
 		t.Error("should contain project")
 	}
-	if !bytes.Contains([]byte(got), []byte("/home/user")) {
-		t.Error("should contain cwd")
+	if !bytes.Contains([]byte(got), []byte("user")) {
+		t.Error("should contain folder name")
 	}
 	if !bytes.Contains([]byte(got), []byte("test message")) {
 		t.Error("should contain message")
@@ -417,7 +417,7 @@ func TestFormatMessage_TreatsPathProjectAsDirectoryWhenCwdMissing(t *testing.T) 
 	}
 
 	got := formatMessage(payload)
-	want := "DIR: /Users/me/project | done"
+	want := "DIR: project | done"
 	if got != want {
 		t.Fatalf("formatMessage() = %q, want %q", got, want)
 	}
@@ -436,15 +436,15 @@ func TestFormatMessage_DoesNotTreatRepoSlugProjectAsDirectory(t *testing.T) {
 	}
 }
 
-func TestFormatMessage_CompactsDeepDirectoryButKeepsTail(t *testing.T) {
+func TestFormatMessage_ShowsLastFolderNameOnly(t *testing.T) {
 	payload := NotifyPayload{
 		Cwd:     "/Users/me/work/company/platform/services/agent-notification/tauri-app/src",
 		Message: "done",
 	}
 
 	got := formatMessage(payload)
-	if !strings.Contains(got, "DIR: /Users/me/.../agent-notification/tauri-app/src") {
-		t.Fatalf("formatMessage() = %q, want compact directory with tail", got)
+	if !strings.Contains(got, "DIR: src") {
+		t.Fatalf("formatMessage() = %q, want last folder name only", got)
 	}
 }
 

@@ -4,7 +4,7 @@
 
 **Goal:** Build and debug a LAN-only Windows notification server in this repo, plus a separate Claude/Codex-compatible discovery skill in a sibling project folder.
 
-**Architecture:** `/Users/gaoguobin/project/agent-notification` contains only the Windows server source, scripts, and docs. The discovery skill lives outside this repo at `/Users/gaoguobin/project/agent-notify-discovery-skill` so this repo stays focused on the Windows project. MVP runs from command line for debugging; no release executable or installer packaging is required yet.
+**Architecture:** `/Users/<username>/project/agent-notification` contains only the Windows server source, scripts, and docs. The discovery skill lives outside this repo at `/Users/<username>/project/agent-notify-discovery-skill` so this repo stays focused on the Windows project. MVP runs from command line for debugging; no release executable or installer packaging is required yet.
 
 **Tech Stack:** Go for the Windows server, mDNS/DNS-SD for automatic LAN discovery, OS-specific toast implementation behind a small interface, Python scripts for the skill.
 
@@ -18,7 +18,7 @@
 - Do design the sender/skill interfaces so Codex and other agents can be added later.
 - Do not require a Windows `.exe` deliverable in MVP.
 - Use `go run .` for local server debugging.
-- Keep the skill in sibling folder `/Users/gaoguobin/project/agent-notify-discovery-skill`.
+- Keep the skill in sibling folder `/Users/<username>/project/agent-notify-discovery-skill`.
 - Current repo should contain only Windows server project files and docs.
 - Discovery acceptance test must start a local server process, then run the installed skill discovery script and verify that this local server is found. Remote Windows LAN discovery is useful, but it is not enough for CI/debug acceptance because multicast may be blocked between machines.
 
@@ -36,7 +36,7 @@ Known issues from status check:
 Windows server repo:
 
 ```text
-/Users/gaoguobin/project/agent-notification/
+/Users/<username>/project/agent-notification/
   .gitignore
   docs/
     superpowers/
@@ -68,7 +68,7 @@ Windows server repo:
 Sibling skill project:
 
 ```text
-/Users/gaoguobin/project/agent-notify-discovery-skill/
+/Users/<username>/project/agent-notify-discovery-skill/
   SKILL.md
   scripts/
     discover.py
@@ -194,7 +194,7 @@ rm -f windows-server/agent-notify-server.exe
 Run:
 
 ```bash
-cd /Users/gaoguobin/project/agent-notification/windows-server
+cd /Users/<username>/project/agent-notification/windows-server
 go test ./...
 go vet ./...
 ```
@@ -236,7 +236,7 @@ git commit -m "fix: isolate windows toast implementation"
 Run:
 
 ```bash
-cd /Users/gaoguobin/project/agent-notification/windows-server
+cd /Users/<username>/project/agent-notification/windows-server
 go get github.com/betamos/zeroconf
 ```
 
@@ -423,7 +423,7 @@ func TestMDNSServiceType(t *testing.T) {
 Run:
 
 ```bash
-cd /Users/gaoguobin/project/agent-notification/windows-server
+cd /Users/<username>/project/agent-notification/windows-server
 go test ./...
 go vet ./...
 ```
@@ -565,7 +565,7 @@ func TestConfigNormalizeFiltersEvents(t *testing.T) {
 Run:
 
 ```bash
-cd /Users/gaoguobin/project/agent-notification/windows-server
+cd /Users/<username>/project/agent-notification/windows-server
 go test ./...
 go vet ./...
 ```
@@ -675,7 +675,7 @@ Keep existing startup scripts if desired, but plan should not depend on exe pack
 Run:
 
 ```bash
-cd /Users/gaoguobin/project/agent-notification/windows-server
+cd /Users/<username>/project/agent-notification/windows-server
 go test ./...
 ```
 
@@ -703,27 +703,27 @@ git commit -m "docs: add command line debug flow"
 
 **Files:**
 
-- Create outside current repo: `/Users/gaoguobin/project/agent-notify-discovery-skill/SKILL.md`
-- Create: `/Users/gaoguobin/project/agent-notify-discovery-skill/install-skill.sh`
-- Create: `/Users/gaoguobin/project/agent-notify-discovery-skill/install-skill.ps1`
-- Create: `/Users/gaoguobin/project/agent-notify-discovery-skill/scripts/discover.py`
-- Create: `/Users/gaoguobin/project/agent-notify-discovery-skill/scripts/send.py`
-- Create: `/Users/gaoguobin/project/agent-notify-discovery-skill/scripts/configure_claude.py`
-- Create: `/Users/gaoguobin/project/agent-notify-discovery-skill/scripts/smoke_discover_local.sh`
-- Create: `/Users/gaoguobin/project/agent-notify-discovery-skill/references/hook-formats.md`
+- Create outside current repo: `/Users/<username>/project/agent-notify-discovery-skill/SKILL.md`
+- Create: `/Users/<username>/project/agent-notify-discovery-skill/install-skill.sh`
+- Create: `/Users/<username>/project/agent-notify-discovery-skill/install-skill.ps1`
+- Create: `/Users/<username>/project/agent-notify-discovery-skill/scripts/discover.py`
+- Create: `/Users/<username>/project/agent-notify-discovery-skill/scripts/send.py`
+- Create: `/Users/<username>/project/agent-notify-discovery-skill/scripts/configure_claude.py`
+- Create: `/Users/<username>/project/agent-notify-discovery-skill/scripts/smoke_discover_local.sh`
+- Create: `/Users/<username>/project/agent-notify-discovery-skill/references/hook-formats.md`
 
 - [ ] **Step 1: Create skill directories**
 
 Run:
 
 ```bash
-mkdir -p /Users/gaoguobin/project/agent-notify-discovery-skill/scripts
-mkdir -p /Users/gaoguobin/project/agent-notify-discovery-skill/references
+mkdir -p /Users/<username>/project/agent-notify-discovery-skill/scripts
+mkdir -p /Users/<username>/project/agent-notify-discovery-skill/references
 ```
 
 - [ ] **Step 2: Create install script**
 
-Create `/Users/gaoguobin/project/agent-notify-discovery-skill/install-skill.sh`:
+Create `/Users/<username>/project/agent-notify-discovery-skill/install-skill.sh`:
 
 ```bash
 #!/usr/bin/env bash
@@ -745,16 +745,16 @@ echo "Installed agent-notify-discovery skill at ${DEST_DIR}"
 Make it executable so `./install-skill.sh` does not fail with exit code `126`:
 
 ```bash
-chmod +x /Users/gaoguobin/project/agent-notify-discovery-skill/install-skill.sh
+chmod +x /Users/<username>/project/agent-notify-discovery-skill/install-skill.sh
 ```
 
 Also document the fallback command:
 
 ```bash
-bash /Users/gaoguobin/project/agent-notify-discovery-skill/install-skill.sh
+bash /Users/<username>/project/agent-notify-discovery-skill/install-skill.sh
 ```
 
-Create `/Users/gaoguobin/project/agent-notify-discovery-skill/install-skill.ps1` for Claude Code on Windows:
+Create `/Users/<username>/project/agent-notify-discovery-skill/install-skill.ps1` for Claude Code on Windows:
 
 ```powershell
 $ErrorActionPreference = "Stop"
@@ -918,7 +918,7 @@ Create a script that posts normalized payload to `/notify`, exits `0` on network
 Required CLI:
 
 ```bash
-python scripts/send.py --url http://192.168.31.50:17891 --agent claude --event stop --project agent-notification
+python scripts/send.py --url http://localhost:17891 --agent claude --event stop --project agent-notification
 ```
 
 - [ ] **Step 6: Create `configure_claude.py`**
@@ -951,14 +951,14 @@ python scripts/send.py --url <url> --agent codex --event stop
 
 - [ ] **Step 8: Verify discovery skill manually**
 
-Create `/Users/gaoguobin/project/agent-notify-discovery-skill/scripts/smoke_discover_local.sh`:
+Create `/Users/<username>/project/agent-notify-discovery-skill/scripts/smoke_discover_local.sh`:
 
 ```bash
 #!/usr/bin/env bash
 set -euo pipefail
 
-SERVER_DIR="/Users/gaoguobin/project/agent-notification/windows-server"
-SKILL_DIR="/Users/gaoguobin/project/agent-notify-discovery-skill"
+SERVER_DIR="/Users/<username>/project/agent-notification/windows-server"
+SKILL_DIR="/Users/<username>/project/agent-notify-discovery-skill"
 LOG_FILE="${TMPDIR:-/tmp}/agent-notify-local-smoke.log"
 
 cd "${SERVER_DIR}"
@@ -1003,7 +1003,7 @@ fi
 Make it executable:
 
 ```bash
-chmod +x /Users/gaoguobin/project/agent-notify-discovery-skill/scripts/smoke_discover_local.sh
+chmod +x /Users/<username>/project/agent-notify-discovery-skill/scripts/smoke_discover_local.sh
 ```
 
 This smoke test is mandatory. It proves the server advertises mDNS locally and the skill can discover the advertised service without manual URL fallback.
@@ -1011,7 +1011,7 @@ This smoke test is mandatory. It proves the server advertises mDNS locally and t
 Run:
 
 ```bash
-cd /Users/gaoguobin/project/agent-notify-discovery-skill
+cd /Users/<username>/project/agent-notify-discovery-skill
 ./install-skill.sh
 ./scripts/smoke_discover_local.sh
 python3 scripts/discover.py
@@ -1029,7 +1029,7 @@ Expected:
 
 - [ ] **Step 9: Do not commit skill in Windows repo**
 
-The sibling skill folder is not part of `/Users/gaoguobin/project/agent-notification`. If a separate git repo is desired, initialize it in `/Users/gaoguobin/project/agent-notify-discovery-skill`.
+The sibling skill folder is not part of `/Users/<username>/project/agent-notification`. If a separate git repo is desired, initialize it in `/Users/<username>/project/agent-notify-discovery-skill`.
 
 ## Task 6: Final Verification Checklist
 
@@ -1043,7 +1043,7 @@ The sibling skill folder is not part of `/Users/gaoguobin/project/agent-notifica
 Run:
 
 ```bash
-cd /Users/gaoguobin/project/agent-notification
+cd /Users/<username>/project/agent-notification
 find . -maxdepth 2 -type d | sort
 ```
 
@@ -1054,7 +1054,7 @@ Expected: no `skills/` directory in this repo.
 Run:
 
 ```bash
-cd /Users/gaoguobin/project/agent-notification/windows-server
+cd /Users/<username>/project/agent-notification/windows-server
 go test ./...
 go vet ./...
 ```
@@ -1079,18 +1079,18 @@ http://localhost:17891/settings
 Run from Mac:
 
 ```bash
-cd /Users/gaoguobin/project/agent-notify-discovery-skill
+cd /Users/<username>/project/agent-notify-discovery-skill
 ./scripts/smoke_discover_local.sh
 ```
 
-Expected: the script starts `/Users/gaoguobin/project/agent-notification/windows-server` with `go run .`, waits for `http://127.0.0.1:17891/health`, runs `python3 scripts/discover.py --timeout 5`, and finds the local mDNS service.
+Expected: the script starts `/Users/<username>/project/agent-notification/windows-server` with `go run .`, waits for `http://127.0.0.1:17891/health`, runs `python3 scripts/discover.py --timeout 5`, and finds the local mDNS service.
 
 - [ ] **Step 5: Verify LAN discovery from Mac to Windows if network permits**
 
 Run from Mac:
 
 ```bash
-cd /Users/gaoguobin/project/agent-notify-discovery-skill
+cd /Users/<username>/project/agent-notify-discovery-skill
 python3 scripts/discover.py
 ```
 
@@ -1109,7 +1109,7 @@ Expected: Windows desktop toast appears using selected preset style.
 - [ ] **Step 7: Commit Windows repo changes**
 
 ```bash
-cd /Users/gaoguobin/project/agent-notification
+cd /Users/<username>/project/agent-notification
 git status --short
 git add .gitignore docs/superpowers windows-server
 git commit -m "feat: add windows notification server"
@@ -1118,7 +1118,7 @@ git commit -m "feat: add windows notification server"
 ## Self-Review
 
 - Spec coverage: Windows server, mDNS/DNS-SD discovery, settings UI, style presets, restart/dev scripts, and future agent extensibility are covered.
-- Scope adjustment: skill project is explicitly outside this repo at `/Users/gaoguobin/project/agent-notify-discovery-skill`.
+- Scope adjustment: skill project is explicitly outside this repo at `/Users/<username>/project/agent-notify-discovery-skill`.
 - MVP adjustment: no release executable required; command-line `go run .` debug flow is primary.
 - Discovery acceptance adjusted: local server + skill discovery smoke test is mandatory; remote LAN multicast discovery is an additional environment check.
 - Known implementation risks are captured as tasks.

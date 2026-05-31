@@ -11,7 +11,7 @@ import time
 
 
 TASK_NAME = "AgentNotifyUIVerify"
-REMOTE_TEMP = r"C:\Users\Administrator\AppData\Local\Temp"
+REMOTE_TEMP = r"C:\Users\%USERNAME%\AppData\Local\Temp"
 
 
 def run(args, check=False):
@@ -103,8 +103,8 @@ def write_capture_script(host, exe_path, process_name):
 
 
 def scp_path(windows_path):
-    if windows_path.startswith(r"C:\Users\Administrator"):
-        suffix = windows_path[len(r"C:\Users\Administrator") :].replace("\\", "/")
+    if windows_path.startswith(r"C:\Users\%USERNAME%"):
+        suffix = windows_path[len(r"C:\Users\%USERNAME%") :].replace("\\", "/")
         return f"/Users/Administrator{suffix}"
     return windows_path.replace("\\", "/")
 
