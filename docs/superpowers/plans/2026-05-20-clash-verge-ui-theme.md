@@ -1025,7 +1025,7 @@ git commit -m "fix: keep client window at 16 by 9"
 Run from repo root:
 
 ```bash
-rsync -av tauri-app/src/main.ts tauri-app/src/theme.ts tauri-app/src/ui.ts tauri-app/src/styles.css Administrator@192.168.31.167:'D:/project/agent-notification/tauri-app/src/'
+rsync -av tauri-app/src/main.ts tauri-app/src/theme.ts tauri-app/src/ui.ts tauri-app/src/styles.css <user>@<host>:'D:/project/agent-notification/tauri-app/src/'
 ```
 
 Expected:
@@ -1039,7 +1039,7 @@ sent
 Run:
 
 ```bash
-ssh Administrator@192.168.31.167 "powershell -NoProfile -Command \"cd D:\\project\\agent-notification\\tauri-app; npm run tauri:build\""
+ssh <user>@<host> "powershell -NoProfile -Command \"cd D:\\project\\agent-notification\\tauri-app; npm run tauri:build\""
 ```
 
 Expected:
@@ -1063,7 +1063,7 @@ Remove-Item "$env:LOCALAPPDATA\com.agentnotify.client" -Recurse -Force -ErrorAct
 print(base64.b64encode(script.encode('utf-16le')).decode())
 PY
 )
-ssh Administrator@192.168.31.167 "powershell -NoProfile -EncodedCommand $ENC"
+ssh <user>@<host> "powershell -NoProfile -EncodedCommand $ENC"
 ```
 
 Expected: command exits with code `0`.
@@ -1074,7 +1074,7 @@ Run:
 
 ```bash
 python3 skills/windows-ui-screenshot/scripts/capture_windows_ui.py \
-  --host Administrator@192.168.31.167 \
+  --host <user>@<host> \
   --exe 'D:\project\agent-notification\tauri-app\src-tauri\target\release\agent-notify.exe' \
   --process agent-notify \
   --out /tmp/agentnotify-clash-verge-ui.png

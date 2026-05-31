@@ -38,7 +38,7 @@ class ConfigureClaudeTests(unittest.TestCase):
 
         configure_claude.configure_hooks(
             settings,
-            "http://192.168.31.167:17891",
+            "http://localhost:17891",
             "claude",
             ["start", "stop"],
         )

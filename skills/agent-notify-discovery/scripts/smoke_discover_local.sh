@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-AGENT_NOTIFICATION_DIR="/Users/gaoguobin/project/agent-notification"
+AGENT_NOTIFICATION_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/../../.." && pwd)"
 SKILL_DIR="$AGENT_NOTIFICATION_DIR/../agent-notify-discovery-skill"
 
 echo "=== Smoke Test: Local mDNS Discovery ==="

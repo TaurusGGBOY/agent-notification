@@ -31,7 +31,7 @@
 
 ## Known Baseline
 
-- Existing worktree: `/Users/gaoguobin/project/agent-notification/.worktrees/windows-one-click-release`
+- Existing worktree: `/Users/<username>/project/agent-notification/.worktrees/windows-one-click-release`
 - Branch: `feature/windows-one-click-release`
 - Baseline Go tests passed on Mac: `66 passed`
 - Baseline frontend build passed on Mac.

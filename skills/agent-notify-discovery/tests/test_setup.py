@@ -30,7 +30,7 @@ class SetupTests(unittest.TestCase):
             os.environ["HOME"] = home
             try:
                 args = Namespace(
-                    url="http://192.168.31.167:17891",
+                    url="http://localhost:17891",
                     agents=["claude", "codex"],
                     events=["start", "stop"],
                     scope="user",
@@ -60,7 +60,7 @@ class SetupTests(unittest.TestCase):
             os.environ["HOME"] = home
             try:
                 args = Namespace(
-                    url="http://192.168.31.167:17891",
+                    url="http://localhost:17891",
                     agents=["claude", "codex"],
                     events=["start", "stop"],
                     scope="user",
@@ -94,7 +94,7 @@ class SetupTests(unittest.TestCase):
                     encoding="utf-8",
                 )
                 args = Namespace(
-                    url="http://192.168.31.167:17891",
+                    url="http://localhost:17891",
                     agents=["claude"],
                     events=["stop"],
                     scope="user",
@@ -132,11 +132,11 @@ class SetupTests(unittest.TestCase):
             @classmethod
             def discover_mdns(cls, timeout=3.0):
                 cls.timeout = timeout
-                return [{"url": "http://192.168.31.167:17891"}]
+                return [{"url": "http://localhost:17891"}]
 
         setup.discover = FakeDiscover
 
-        self.assertEqual(setup.discover_server_url(), "http://192.168.31.167:17891")
+        self.assertEqual(setup.discover_server_url(), "http://localhost:17891")
         self.assertTrue(FakeDiscover.reexec_called)
         self.assertEqual(FakeDiscover.timeout, 8.0)
 

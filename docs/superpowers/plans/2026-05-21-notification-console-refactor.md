@@ -57,7 +57,7 @@
 **Files:**
 - Verify: Windows release build output.
 
-- [ ] Sync changed files to `Administrator@192.168.31.167`.
+- [ ] Sync changed files to `<user>@<host>`.
 - [ ] Run `cd D:\project\agent-notification\windows-server; go test ./... -v`.
 - [ ] Run `cd D:\project\agent-notification\tauri-app; npm run tauri:build`.
 - [ ] Capture screenshot with `skills/windows-ui-screenshot/scripts/capture_windows_ui.py`.

@@ -18,14 +18,14 @@ Automate Windows GUI acceptance from macOS/Linux without manual clicks.
 1. Confirm an interactive console session exists:
 
    ```bash
-   ssh Administrator@192.168.31.167 "query user"
+   ssh <user>@<host> "query user"
    ```
 
 2. Run the bundled script:
 
    ```bash
    python3 skills/windows-ui-screenshot/scripts/capture_windows_ui.py \
-     --host Administrator@192.168.31.167 \
+     --host <user>@<host> \
      --exe 'D:\project\agent-notification\tauri-app\src-tauri\target\release\agent-notify.exe' \
      --process agent-notify \
      --out /tmp/agentnotify-ui.png
@@ -40,7 +40,7 @@ Automate Windows GUI acceptance from macOS/Linux without manual clicks.
 ## Notes
 
 - Requires an active logged-in Windows user session.
-- Script writes remote temp files under `C:\Users\Administrator\AppData\Local\Temp`.
+- Script writes remote temp files under `C:\Users\<user>\AppData\Local\Temp`.
 - The task is named `AgentNotifyUIVerify` by default.
 - If the screenshot shows UI but `Failed to fetch`, diagnose app/server networking separately.
 

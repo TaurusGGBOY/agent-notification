@@ -78,7 +78,7 @@ Endpoints:
 {
   "name": "Agent Notify Server",
   "version": "0.1.0",
-  "url": "http://192.168.31.50:17891",
+  "url": "http://localhost:17891",
   "serviceType": "_agent-notify._tcp.local.",
   "supportedEvents": ["start", "stop"],
   "supportedStyles": ["clean", "status-color", "agent-badge", "compact"]
@@ -97,7 +97,7 @@ Payload:
   "agent": "claude",
   "event": "stop",
   "project": "agent-notification",
-  "cwd": "/Users/gaoguobin/project/agent-notification",
+  "cwd": "/Users/<username>/project/agent-notification",
   "message": "Agent task complete",
   "timestamp": "2026-04-28T14:32:00+08:00",
   "sourcePayload": {}
@@ -214,7 +214,7 @@ Workflow:
 
 ```bash
 python scripts/send.py \
-  --url http://192.168.31.50:17891 \
+  --url http://localhost:17891 \
   --agent claude \
   --event stop
 ```

@@ -41,7 +41,7 @@ def discover_server_url(timeout=DISCOVERY_TIMEOUT):
 def prompt_for_url(non_interactive):
     if non_interactive or not sys.stdin.isatty():
         return None
-    value = input("Agent Notify server URL (example: http://192.168.31.167:17891): ").strip()
+    value = input("Agent Notify server URL (example: http://localhost:17891): ").strip()
     return value or None
 
 
