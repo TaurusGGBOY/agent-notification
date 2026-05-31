@@ -11,3 +11,5 @@ tauri-app/node_modules/
 __pycache__/
 *.pyc
 .claude/settings.local.json
+.claude/
+CLAUDE.md

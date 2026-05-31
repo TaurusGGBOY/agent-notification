@@ -30,7 +30,7 @@ Windows users should install and start the Tauri app from the release package. T
 ### 2. Install skill
 
 ```bash
-./scripts/install-skill.sh [--test]
+npx skills add TaurusGGBOY/agent-notification
 ```
 
 ### 3. Configure agent hooks
