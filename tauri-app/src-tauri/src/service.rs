@@ -8,9 +8,12 @@ use tauri::{AppHandle, Emitter, Manager, State};
 use tauri_plugin_shell::process::{CommandChild, CommandEvent};
 use tauri_plugin_shell::ShellExt;
 
+use crate::native_notification;
+
 const CONTROL_ADDR: &str = "127.0.0.1:17891";
 // This LAN-only tool intentionally exposes the entire unauthenticated Agent Notify HTTP API on the LAN.
 const SIDECAR_LISTEN_ADDR: &str = "0.0.0.0:17891";
+const NOTIFICATION_STDOUT_PREFIX: &str = "AGENT_NOTIFY_TAURI_NOTIFICATION ";
 
 pub fn control_addr() -> &'static str {
     CONTROL_ADDR
@@ -166,22 +169,31 @@ pub fn ensure_sidecar(app: &AppHandle) -> Result<(), String> {
         ));
     }
 
-    let command = app
+    let mut command = app
         .shell()
         .sidecar("agent-notify-server")
-        .map_err(|err| format!("failed to create sidecar command: {err}"))?;
+        .map_err(|err| format!("failed to create sidecar command: {err}"))?
+        .env("AGENT_NOTIFY_HTTP_ADDR", sidecar_listen_addr())
+        .env("AGENT_NOTIFY_INSTANCE_TOKEN", &instance_token);
+
+    #[cfg(target_os = "macos")]
+    {
+        command = command.env("AGENT_NOTIFY_TAURI_STDOUT", "1");
+    }
 
     let (mut rx, child) = command
-        .env("AGENT_NOTIFY_HTTP_ADDR", sidecar_listen_addr())
-        .env("AGENT_NOTIFY_INSTANCE_TOKEN", &instance_token)
         .spawn()
         .map_err(|err| format!("failed to spawn sidecar: {err}"))?;
 
     let app_for_events = app.clone();
     tauri::async_runtime::spawn(async move {
+        let mut stdout_router = SidecarStdoutRouter::default();
         while let Some(event) = rx.recv().await {
             match event {
                 CommandEvent::Stdout(bytes) => {
+                    for notification in stdout_router.push(&bytes) {
+                        show_forwarded_notification(app_for_events.clone(), notification);
+                    }
                     let line = String::from_utf8_lossy(&bytes).to_string();
                     let _ = app_for_events.emit("agentnotify://server-stdout", line);
                 }
@@ -292,10 +304,65 @@ impl Client {
     }
 }
 
+#[derive(Clone, Debug, PartialEq, serde::Deserialize)]
+struct ForwardedNotification {
+    title: String,
+    body: String,
+}
+
+#[derive(Default)]
+struct SidecarStdoutRouter {
+    pending: Vec<u8>,
+}
+
+impl SidecarStdoutRouter {
+    fn push(&mut self, chunk: &[u8]) -> Vec<ForwardedNotification> {
+        self.pending.extend_from_slice(chunk);
+        let mut notifications = Vec::new();
+
+        while let Some(newline) = self.pending.iter().position(|byte| *byte == b'\n') {
+            let mut line = self.pending.drain(..=newline).collect::<Vec<_>>();
+            while matches!(line.last(), Some(b'\r' | b'\n')) {
+                line.pop();
+            }
+            let line = String::from_utf8_lossy(&line);
+            if let Some(notification) = parse_forwarded_notification_line(&line) {
+                notifications.push(notification);
+            }
+        }
+
+        notifications
+    }
+}
+
+fn parse_forwarded_notification_line(line: &str) -> Option<ForwardedNotification> {
+    let payload = line.strip_prefix(NOTIFICATION_STDOUT_PREFIX)?;
+    serde_json::from_str(payload).ok()
+}
+
+fn show_forwarded_notification(app: AppHandle, notification: ForwardedNotification) {
+    let emit_app = app.clone();
+    let result = app.run_on_main_thread(move || {
+        if let Err(err) = native_notification::show(&notification.title, &notification.body) {
+            let _ = emit_app.emit(
+                "agentnotify://server-stderr",
+                format!("native macOS notification failed: {err}\n"),
+            );
+        }
+    });
+    if let Err(err) = result {
+        let _ = app.emit(
+            "agentnotify://server-stderr",
+            format!("schedule native macOS notification failed: {err}\n"),
+        );
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::{
-        control_addr, health_instance_token_matches, http_url_host_port, sidecar_listen_addr,
+        control_addr, health_instance_token_matches, http_url_host_port,
+        parse_forwarded_notification_line, sidecar_listen_addr, SidecarStdoutRouter,
     };
 
     #[test]
@@ -351,5 +418,49 @@ mod tests {
         assert!(!health_instance_token_matches(external, "token-123"));
         assert!(!health_instance_token_matches(other_instance, "token-123"));
         assert!(!health_instance_token_matches(managed, ""));
+    }
+
+    #[test]
+    fn parses_forwarded_tauri_notification_stdout_line() {
+        let line = r#"AGENT_NOTIFY_TAURI_NOTIFICATION {"title":"Codex Started","body":"hello"}"#;
+
+        let notification = parse_forwarded_notification_line(line).expect("notification");
+
+        assert_eq!(notification.title, "Codex Started");
+        assert_eq!(notification.body, "hello");
+    }
+
+    #[test]
+    fn routes_forwarded_notifications_from_split_stdout_chunks() {
+        let mut router = SidecarStdoutRouter::default();
+
+        assert!(router
+            .push(r#"AGENT_NOTIFY_TAURI_NOTIFICATION {"title":"Codex"#.as_bytes())
+            .is_empty());
+        let notifications =
+            router.push(" Started\",\"body\":\"hello\"}\nplain log line\n".as_bytes());
+
+        assert_eq!(notifications.len(), 1);
+        assert_eq!(notifications[0].title, "Codex Started");
+        assert_eq!(notifications[0].body, "hello");
+    }
+
+    #[test]
+    fn routes_forwarded_notifications_with_utf8_split_between_chunks() {
+        let mut router = SidecarStdoutRouter::default();
+        let line = r#"AGENT_NOTIFY_TAURI_NOTIFICATION {"title":"开始通知","body":"agent-notification 已启动"}"#;
+        let bytes = line.as_bytes();
+        let split = bytes
+            .windows("通知".len())
+            .position(|window| window == "通知".as_bytes())
+            .expect("notification text in test line")
+            + 1;
+
+        assert!(router.push(&bytes[..split]).is_empty());
+        let notifications = router.push(&[&bytes[split..], b"\n"].concat());
+
+        assert_eq!(notifications.len(), 1);
+        assert_eq!(notifications[0].title, "开始通知");
+        assert_eq!(notifications[0].body, "agent-notification 已启动");
     }
 }

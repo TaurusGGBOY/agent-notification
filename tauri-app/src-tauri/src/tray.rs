@@ -110,10 +110,7 @@ async fn get_config() -> Result<serde_json::Value, String> {
         stream
             .read_to_string(&mut response)
             .map_err(|err| err.to_string())?;
-        let body = response
-            .split("\r\n\r\n")
-            .nth(1)
-            .unwrap_or("{}");
+        let body = response.split("\r\n\r\n").nth(1).unwrap_or("{}");
         serde_json::from_str(body).map_err(|err| err.to_string())
     })
     .await
@@ -131,11 +128,7 @@ async fn set_events_enabled(enabled: bool) -> Result<(), String> {
         .and_then(|v| serde_json::to_string(v).ok())
         .unwrap_or_else(|| "{}".to_string());
 
-    let events = if enabled {
-        r#"["start","stop"]"#
-    } else {
-        "[]"
-    };
+    let events = if enabled { r#"["start","stop"]"# } else { "[]" };
     let body = format!(
         r#"{{"notificationStyle":"{}","enabledEvents":{},"futureOverrides":{}}}"#,
         notification_style, events, future_overrides

@@ -2,6 +2,8 @@ package main
 
 import (
 	"encoding/json"
+	"fmt"
+	"io"
 	"log"
 	"net"
 	"net/http"
@@ -12,8 +14,11 @@ import (
 )
 
 const (
-	version         = "1.0.1"
-	mdnsServiceType = "_agent-notify._tcp"
+	version                   = "1.0.1"
+	mdnsServiceType           = "_agent-notify._tcp"
+	tauriNotificationPrefix   = "AGENT_NOTIFY_TAURI_NOTIFICATION "
+	tauriNotificationEnvVar   = "AGENT_NOTIFY_TAURI_STDOUT"
+	tauriNotificationEnvValue = "1"
 )
 
 func supportedEvents() []string {
@@ -77,17 +82,51 @@ type ErrorResponse struct {
 	Error string `json:"error"`
 }
 
+type tauriNotificationPayload struct {
+	Title string `json:"title"`
+	Body  string `json:"body"`
+}
+
+type notificationForwarder interface {
+	Forward(title, body string) error
+}
+
+type stdoutNotificationForwarder struct {
+	writer io.Writer
+}
+
+func (f stdoutNotificationForwarder) Forward(title, body string) error {
+	payload, err := json.Marshal(tauriNotificationPayload{
+		Title: title,
+		Body:  body,
+	})
+	if err != nil {
+		return err
+	}
+	_, err = fmt.Fprintf(f.writer, "%s%s\n", tauriNotificationPrefix, payload)
+	return err
+}
+
+func newNotificationForwarder() notificationForwarder {
+	if strings.TrimSpace(os.Getenv(tauriNotificationEnvVar)) == tauriNotificationEnvValue {
+		return stdoutNotificationForwarder{writer: os.Stdout}
+	}
+	return nil
+}
+
 type Server struct {
-	config    *Config
-	notifier  Notifier
-	historyMu sync.Mutex
-	history   []NotificationHistoryItem
+	config                *Config
+	notifier              Notifier
+	notificationForwarder notificationForwarder
+	historyMu             sync.Mutex
+	history               []NotificationHistoryItem
 }
 
 func NewServer(cfg *Config) *Server {
 	return &Server{
-		config:   cfg,
-		notifier: NewToastNotifier("AgentNotify"),
+		config:                cfg,
+		notifier:              NewToastNotifier("AgentNotify"),
+		notificationForwarder: newNotificationForwarder(),
 	}
 }
 
@@ -208,7 +247,11 @@ func (s *Server) NotifyHandler(w http.ResponseWriter, r *http.Request) {
 	title := formatTitle(payload.Agent, event)
 	message := formatMessage(payload)
 
-	if err := s.notifier.NotifyWithStyle(
+	if s.notificationForwarder != nil {
+		if err := s.notificationForwarder.Forward(title, message); err != nil {
+			log.Printf("Forward notification failed: %v", err)
+		}
+	} else if err := s.notifier.NotifyWithStyle(
 		cfg.NotificationStyle,
 		event,
 		title,

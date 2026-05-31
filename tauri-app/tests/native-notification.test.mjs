@@ -4,24 +4,25 @@ import test from "node:test";
 
 const readProjectFile = (path) => readFile(new URL(`../${path}`, import.meta.url), "utf8");
 
-test("test notification uses the Tauri native notification plugin", async () => {
+test("managed macOS sidecar notifications are shown by the app process", async () => {
   const api = await readProjectFile("src/api.ts");
   const main = await readProjectFile("src-tauri/src/main.rs");
   const capabilities = JSON.parse(await readProjectFile("src-tauri/capabilities/default.json"));
   const packageJson = JSON.parse(await readProjectFile("package.json"));
   const cargoToml = await readProjectFile("src-tauri/Cargo.toml");
+  const service = await readProjectFile("src-tauri/src/service.rs");
+  const nativeNotification = await readProjectFile("src-tauri/native/macos_notification.m");
 
-  assert.match(api, /@tauri-apps\/plugin-notification/);
-  assert.match(api, /isPermissionGranted/);
-  assert.match(api, /requestPermission/);
-  assert.match(api, /sendNotification/);
-  assert.match(api, /sendNativeTestNotification/);
-  assert.match(api, /const windowsNotifications = await getWindowsNotificationStatus\(\);/);
-  assert.match(api, /if \(!windowsNotifications\.supported\) \{[\s\S]*await sendNativeTestNotification\(event\);[\s\S]*\}/);
-  assert.match(main, /tauri_plugin_notification::init\(\)/);
-  assert.ok(capabilities.permissions.includes("notification:default"));
-  assert.ok(packageJson.dependencies["@tauri-apps/plugin-notification"]);
-  assert.match(cargoToml, /tauri-plugin-notification/);
+  assert.doesNotMatch(api, /@tauri-apps\/plugin-notification/);
+  assert.doesNotMatch(main, /tauri_plugin_notification::init\(\)/);
+  assert.ok(!capabilities.permissions.includes("notification:default"));
+  assert.ok(!packageJson.dependencies["@tauri-apps/plugin-notification"]);
+  assert.doesNotMatch(cargoToml, /tauri-plugin-notification/);
+  assert.match(service, /#\[cfg\(target_os = "macos"\)\][\s\S]*AGENT_NOTIFY_TAURI_STDOUT/);
+  assert.match(service, /AGENT_NOTIFY_TAURI_NOTIFICATION/);
+  assert.match(nativeNotification, /UNUserNotificationCenter/);
+  assert.match(nativeNotification, /UNNotificationPresentationOptionBanner/);
+  assert.doesNotMatch(nativeNotification, /NSUserNotification/);
 });
 
 test("macOS notification settings opens this app's notification detail page", async () => {
