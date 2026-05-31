@@ -2,7 +2,11 @@
 
 package main
 
-import "testing"
+import (
+	"encoding/json"
+	"os"
+	"testing"
+)
 
 func TestDarwinNotificationRequestUsesAgentSubtitleAndEventSound(t *testing.T) {
 	req := newDarwinNotificationRequest("start", "开始通知", "agent-notification 已启动", "codex", "AgentNotify")
@@ -29,5 +33,23 @@ func TestDarwinNotificationRequestFallsBackToAppNameSubtitle(t *testing.T) {
 	}
 	if req.Sound != "Glass" {
 		t.Fatalf("Sound = %q", req.Sound)
+	}
+}
+
+func TestDarwinNotificationBundleIdentifierMatchesTauriConfig(t *testing.T) {
+	data, err := os.ReadFile("../tauri-app/src-tauri/tauri.conf.json")
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	var config struct {
+		Identifier string `json:"identifier"`
+	}
+	if err := json.Unmarshal(data, &config); err != nil {
+		t.Fatal(err)
+	}
+
+	if darwinNotificationBundleIdentifier != config.Identifier {
+		t.Fatalf("darwinNotificationBundleIdentifier = %q, tauri identifier = %q", darwinNotificationBundleIdentifier, config.Identifier)
 	}
 }

@@ -13,38 +13,6 @@ package main
 #import <Cocoa/Cocoa.h>
 #import <UserNotifications/UserNotifications.h>
 
-@interface NSBundle (AgentNotifyBundleIdentifier)
-- (NSString *)agentnotify_bundleIdentifier;
-@end
-
-@implementation NSBundle (AgentNotifyBundleIdentifier)
-- (NSString *)agentnotify_bundleIdentifier {
-	NSString *identifier = [self agentnotify_bundleIdentifier];
-	if (identifier != nil && [identifier length] > 0) {
-		return identifier;
-	}
-	if (self == [NSBundle mainBundle]) {
-		return @"com.taurusggboy.agent-notification";
-	}
-	return identifier;
-}
-@end
-
-static void agentnotify_ensure_bundle_identifier(void) {
-	if ([[[NSBundle mainBundle] bundleIdentifier] length] > 0) {
-		return;
-	}
-
-	static dispatch_once_t once;
-	dispatch_once(&once, ^{
-		Method original = class_getInstanceMethod([NSBundle class], @selector(bundleIdentifier));
-		Method replacement = class_getInstanceMethod([NSBundle class], @selector(agentnotify_bundleIdentifier));
-		if (original != NULL && replacement != NULL) {
-			method_exchangeImplementations(original, replacement);
-		}
-	});
-}
-
 static NSString *agentnotify_string(const char *value) {
 	if (value == NULL) {
 		return @"";
@@ -69,12 +37,79 @@ static NSString *agentnotify_string(const char *value) {
 	return @"";
 }
 
+static NSString *agentnotifyFallbackBundleIdentifier = @"com.agentnotify.client";
+
+@interface NSBundle (AgentNotifyBundleIdentifier)
+- (NSString *)agentnotify_bundleIdentifier;
+@end
+
+@implementation NSBundle (AgentNotifyBundleIdentifier)
+- (NSString *)agentnotify_bundleIdentifier {
+	NSString *identifier = [self agentnotify_bundleIdentifier];
+	if (identifier != nil && [identifier length] > 0) {
+		return identifier;
+	}
+	if (self == [NSBundle mainBundle]) {
+		return agentnotifyFallbackBundleIdentifier;
+	}
+	return identifier;
+}
+@end
+
+@interface AgentNotifyNotificationDelegate : NSObject <UNUserNotificationCenterDelegate>
+@end
+
+@implementation AgentNotifyNotificationDelegate
+- (void)userNotificationCenter:(UNUserNotificationCenter *)center
+       willPresentNotification:(UNNotification *)notification
+         withCompletionHandler:(void (^)(UNNotificationPresentationOptions options))completionHandler {
+	UNNotificationPresentationOptions options = UNNotificationPresentationOptionSound;
+	if (@available(macOS 11.0, *)) {
+		options |= UNNotificationPresentationOptionBanner | UNNotificationPresentationOptionList;
+	} else {
+		options |= UNNotificationPresentationOptionAlert;
+	}
+	completionHandler(options);
+}
+@end
+
+static AgentNotifyNotificationDelegate *agentnotifyNotificationDelegate = nil;
+
+static void agentnotify_ensure_bundle_identifier(const char *bundleIdentifier) {
+	NSString *fallbackIdentifier = agentnotify_string(bundleIdentifier);
+	if ([fallbackIdentifier length] > 0) {
+		agentnotifyFallbackBundleIdentifier = [fallbackIdentifier copy];
+	}
+
+	if ([[[NSBundle mainBundle] bundleIdentifier] length] > 0) {
+		return;
+	}
+
+	static dispatch_once_t once;
+	dispatch_once(&once, ^{
+		Method original = class_getInstanceMethod([NSBundle class], @selector(bundleIdentifier));
+		Method replacement = class_getInstanceMethod([NSBundle class], @selector(agentnotify_bundleIdentifier));
+		if (original != NULL && replacement != NULL) {
+			method_exchangeImplementations(original, replacement);
+		}
+	});
+}
+
+static void agentnotify_configure_notification_center(void) {
+	static dispatch_once_t once;
+	dispatch_once(&once, ^{
+		agentnotifyNotificationDelegate = [[AgentNotifyNotificationDelegate alloc] init];
+		[[UNUserNotificationCenter currentNotificationCenter] setDelegate:agentnotifyNotificationDelegate];
+	});
+}
+
 // Initialize NSApplication as a background accessory (no Dock icon).
 // Must be called once before any notification API usage.
-static void agentnotify_init_app(void) {
-	agentnotify_ensure_bundle_identifier();
+static void agentnotify_init_app(const char *bundleIdentifier) {
+	agentnotify_ensure_bundle_identifier(bundleIdentifier);
 	[NSApplication sharedApplication];
 	[NSApp setActivationPolicy:NSApplicationActivationPolicyAccessory];
+	agentnotify_configure_notification_center();
 }
 
 static int agentnotify_deliver_notification(
@@ -185,7 +220,9 @@ var appOnce sync.Once
 
 func ensureApp() {
 	appOnce.Do(func() {
-		C.agentnotify_init_app()
+		bundleID := C.CString(darwinNotificationBundleIdentifier)
+		defer C.free(unsafe.Pointer(bundleID))
+		C.agentnotify_init_app(bundleID)
 	})
 }
 
