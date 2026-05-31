@@ -7,7 +7,7 @@ Use caveman mode from session start unless user says "stop caveman" or "normal m
 
 ## Repository Workflow
 
-- Use git worktrees for feature work. Keep the main worktree available for `main`.
+- Use git worktrees for feature work. Keep the repository root worktree on `main` long-term.
 - Create one feature branch per task in its own worktree.
 - Do development and verification inside the feature worktree.
 - Push the feature branch and open a PR into `main`.
