@@ -1,5 +1,6 @@
 use serde::Serialize;
 
+const APP_BUNDLE_ID: &str = "com.agentnotify.client";
 const APP_NOTIFICATION_IDS: [&str; 2] = ["AgentNotify", "com.agentnotify.client"];
 const NOTIFICATION_SETTINGS_ROOT: &str =
     r"HKCU\Software\Microsoft\Windows\CurrentVersion\Notifications\Settings";
@@ -81,7 +82,10 @@ fn registry_key_exists(output: &str) -> bool {
 
 #[cfg_attr(not(any(windows, test)), allow(dead_code))]
 fn parse_registry_dword(value: &str) -> Option<bool> {
-    let parsed = if let Some(hex) = value.strip_prefix("0x").or_else(|| value.strip_prefix("0X")) {
+    let parsed = if let Some(hex) = value
+        .strip_prefix("0x")
+        .or_else(|| value.strip_prefix("0X"))
+    {
         u32::from_str_radix(hex, 16).ok()?
     } else {
         value.parse::<u32>().ok()?
@@ -175,11 +179,23 @@ fn query_macos_notification_enabled() -> Option<bool> {
 
 #[cfg(target_os = "macos")]
 fn open_macos_notification_settings_impl() -> Result<(), String> {
-    std::process::Command::new("open")
-        .arg("x-apple.systempreferences:com.apple.preference.notifications")
-        .spawn()
-        .map_err(|err| format!("failed to open macOS notification settings: {err}"))?;
-    Ok(())
+    let urls = [
+        format!(
+            "x-apple.systempreferences:com.apple.Notifications-Settings.extension?id={APP_BUNDLE_ID}"
+        ),
+        format!("x-apple.systempreferences:com.apple.preference.notifications?id={APP_BUNDLE_ID}"),
+        "x-apple.systempreferences:com.apple.preference.notifications".to_string(),
+    ];
+
+    for url in urls {
+        match std::process::Command::new("open").arg(&url).status() {
+            Ok(status) if status.success() => return Ok(()),
+            Ok(_) => continue,
+            Err(err) => return Err(format!("failed to open macOS notification settings: {err}")),
+        }
+    }
+
+    Err("failed to open macOS notification settings".to_string())
 }
 
 #[cfg(not(target_os = "macos"))]

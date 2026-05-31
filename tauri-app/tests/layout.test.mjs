@@ -46,7 +46,7 @@ test("dashboard exposes a copyable skill install command", async () => {
   const styles = await readProjectFile("src/styles.css");
   const rootPackage = JSON.parse(await readProjectFile("../package.json"));
 
-  assert.match(ui, /SKILL_INSTALL_COMMAND = "npx github:TaurusGGBOY\/agent-notification"/);
+  assert.match(ui, /SKILL_INSTALL_COMMAND = "npx skills add TaurusGGBOY\/agent-notification"/);
   assert.match(ui, /安装 skill 命令/);
   assert.match(ui, /data-action="copy-skill-install-command"/);
   assert.match(ui, /navigator\.clipboard\.writeText\(SKILL_INSTALL_COMMAND\)/);
