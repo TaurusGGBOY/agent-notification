@@ -458,6 +458,28 @@ func TestHealthHandler(t *testing.T) {
 	}
 }
 
+func TestHealthHandlerIncludesSidecarInstanceToken(t *testing.T) {
+	t.Setenv("AGENT_NOTIFY_INSTANCE_TOKEN", "token-123")
+	cfg := DefaultConfig()
+	server := newTestServer(cfg)
+
+	req := httptest.NewRequest(http.MethodGet, "/health", nil)
+	w := httptest.NewRecorder()
+
+	server.HealthHandler(w, req)
+
+	if w.Code != http.StatusOK {
+		t.Errorf("expected status %d, got %d", http.StatusOK, w.Code)
+	}
+
+	var resp HealthResponse
+	json.NewDecoder(w.Body).Decode(&resp)
+
+	if resp.InstanceToken != "token-123" {
+		t.Errorf("expected instance token %q, got %q", "token-123", resp.InstanceToken)
+	}
+}
+
 func TestManifestHandler(t *testing.T) {
 	cfg := DefaultConfig()
 	server := newTestServer(cfg)

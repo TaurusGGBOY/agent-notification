@@ -1,7 +1,8 @@
 use std::io::{Read, Write};
 use std::net::{TcpStream, ToSocketAddrs};
+use std::process;
 use std::sync::Mutex;
-use std::time::{Duration, Instant};
+use std::time::{Duration, Instant, SystemTime, UNIX_EPOCH};
 
 use tauri::{AppHandle, Emitter, Manager, State};
 use tauri_plugin_shell::process::{CommandChild, CommandEvent};
@@ -21,13 +22,19 @@ pub fn sidecar_listen_addr() -> &'static str {
 
 pub struct ServiceState {
     child: Mutex<Option<CommandChild>>,
+    instance_token: String,
 }
 
 impl ServiceState {
     pub fn new() -> Self {
         Self {
             child: Mutex::new(None),
+            instance_token: new_instance_token(),
         }
+    }
+
+    fn instance_token(&self) -> &str {
+        &self.instance_token
     }
 }
 
@@ -43,6 +50,35 @@ pub fn is_server_healthy() -> bool {
         Err(_) => return false,
     };
     client.get("/health").is_ok()
+}
+
+fn new_instance_token() -> String {
+    let nanos = SystemTime::now()
+        .duration_since(UNIX_EPOCH)
+        .map(|duration| duration.as_nanos())
+        .unwrap_or_default();
+    format!("{}-{nanos}", process::id())
+}
+
+fn health_instance_token_matches(body: &str, expected_token: &str) -> bool {
+    if expected_token.trim().is_empty() {
+        return false;
+    }
+    let Ok(health) = serde_json::from_str::<serde_json::Value>(body) else {
+        return false;
+    };
+    health.get("instanceToken").and_then(|value| value.as_str()) == Some(expected_token)
+}
+
+fn is_managed_server_healthy(instance_token: &str) -> bool {
+    let client = match Client::new(control_addr(), Duration::from_millis(600)) {
+        Ok(c) => c,
+        Err(_) => return false,
+    };
+    match client.get_text("/health") {
+        Ok(body) => health_instance_token_matches(&body, instance_token),
+        Err(_) => false,
+    }
 }
 
 fn manifest_lan_addr() -> Result<String, String> {
@@ -92,32 +128,41 @@ pub fn is_server_lan_reachable() -> bool {
     client.get("/health").is_ok()
 }
 
-fn wait_for_server_lan_reachable(timeout: Duration) -> bool {
+fn wait_for_managed_server_ready(instance_token: &str, timeout: Duration) -> bool {
     let deadline = Instant::now() + timeout;
     while Instant::now() < deadline {
-        if is_server_lan_reachable() {
+        if is_managed_server_healthy(instance_token) && is_server_lan_reachable() {
             return true;
         }
         std::thread::sleep(Duration::from_millis(100));
     }
-    is_server_lan_reachable()
+    is_managed_server_healthy(instance_token) && is_server_lan_reachable()
 }
 
 pub fn ensure_sidecar(app: &AppHandle) -> Result<(), String> {
-    if is_server_healthy() && is_server_lan_reachable() {
+    let state = app.state::<ServiceState>();
+    let instance_token = state.instance_token().to_string();
+
+    if is_managed_server_healthy(&instance_token) && is_server_lan_reachable() {
         return Ok(());
     }
 
-    let state = app.state::<ServiceState>();
     let mut guard = state.child.lock().map_err(|_| "service mutex poisoned")?;
     if guard.is_some() {
         drop(guard);
-        if wait_for_server_lan_reachable(Duration::from_secs(5)) {
+        if wait_for_managed_server_ready(&instance_token, Duration::from_secs(5)) {
             return Ok(());
         }
         return Err(format!(
             "server running but did not become LAN reachable on {}",
             sidecar_listen_addr()
+        ));
+    }
+
+    if is_server_healthy() {
+        return Err(format!(
+            "port {} is already used by an external Agent Notify server; quit that process before starting AgentNotify",
+            control_addr()
         ));
     }
 
@@ -128,6 +173,7 @@ pub fn ensure_sidecar(app: &AppHandle) -> Result<(), String> {
 
     let (mut rx, child) = command
         .env("AGENT_NOTIFY_HTTP_ADDR", sidecar_listen_addr())
+        .env("AGENT_NOTIFY_INSTANCE_TOKEN", &instance_token)
         .spawn()
         .map_err(|err| format!("failed to spawn sidecar: {err}"))?;
 
@@ -151,7 +197,7 @@ pub fn ensure_sidecar(app: &AppHandle) -> Result<(), String> {
     *guard = Some(child);
     drop(guard);
 
-    if wait_for_server_lan_reachable(Duration::from_secs(5)) {
+    if wait_for_managed_server_ready(&instance_token, Duration::from_secs(5)) {
         Ok(())
     } else {
         let mut guard = state.child.lock().map_err(|_| "service mutex poisoned")?;
@@ -184,11 +230,7 @@ pub fn restart_service(app: AppHandle) -> Result<(), String> {
 pub fn service_status(state: State<ServiceState>) -> ServiceStatus {
     ServiceStatus {
         healthy: is_server_healthy(),
-        managed_by_tauri: state
-            .child
-            .lock()
-            .map(|child| child.is_some())
-            .unwrap_or(false),
+        managed_by_tauri: is_managed_server_healthy(state.instance_token()),
     }
 }
 
@@ -252,7 +294,9 @@ impl Client {
 
 #[cfg(test)]
 mod tests {
-    use super::{control_addr, http_url_host_port, sidecar_listen_addr};
+    use super::{
+        control_addr, health_instance_token_matches, http_url_host_port, sidecar_listen_addr,
+    };
 
     #[test]
     fn sidecar_listens_on_all_interfaces_for_lan_agents() {
@@ -295,5 +339,17 @@ mod tests {
             http_url_host_port("http://192.168.1.10:notaport/manifest"),
             None
         );
+    }
+
+    #[test]
+    fn health_instance_token_must_match_managed_sidecar() {
+        let managed = r#"{"status":"ok","version":"1.0.1","instanceToken":"token-123"}"#;
+        let external = r#"{"status":"ok","version":"1.0.1"}"#;
+        let other_instance = r#"{"status":"ok","version":"1.0.1","instanceToken":"other"}"#;
+
+        assert!(health_instance_token_matches(managed, "token-123"));
+        assert!(!health_instance_token_matches(external, "token-123"));
+        assert!(!health_instance_token_matches(other_instance, "token-123"));
+        assert!(!health_instance_token_matches(managed, ""));
     }
 }

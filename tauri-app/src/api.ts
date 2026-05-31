@@ -28,6 +28,11 @@ export interface BroadcastStatus {
   enabled: boolean;
 }
 
+export interface ServiceStatus {
+  healthy: boolean;
+  managed_by_tauri: boolean;
+}
+
 export interface WindowsNotificationStatus {
   enabled: boolean;
   supported: boolean;
@@ -91,6 +96,10 @@ export async function saveConfig(config: AgentConfig): Promise<void> {
 
 export async function restartService(): Promise<void> {
   await invoke("restart_service");
+}
+
+export async function getServiceStatus(): Promise<ServiceStatus> {
+  return await invoke<ServiceStatus>("service_status");
 }
 
 export async function getWindowsNotificationStatus(): Promise<WindowsNotificationStatus> {

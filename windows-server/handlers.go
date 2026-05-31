@@ -33,8 +33,9 @@ func localHostname() string {
 }
 
 type HealthResponse struct {
-	Status  string `json:"status"`
-	Version string `json:"version"`
+	Status        string `json:"status"`
+	Version       string `json:"version"`
+	InstanceToken string `json:"instanceToken,omitempty"`
 }
 
 type ManifestResponse struct {
@@ -97,8 +98,9 @@ func (s *Server) HealthHandler(w http.ResponseWriter, r *http.Request) {
 	}
 
 	resp := HealthResponse{
-		Status:  "ok",
-		Version: version,
+		Status:        "ok",
+		Version:       version,
+		InstanceToken: strings.TrimSpace(os.Getenv("AGENT_NOTIFY_INSTANCE_TOKEN")),
 	}
 
 	w.Header().Set("Content-Type", "application/json")

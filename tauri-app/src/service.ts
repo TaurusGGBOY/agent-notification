@@ -1,4 +1,12 @@
-import { getBroadcastStatus, getConfig, getMacosNotificationStatus, getManifest, getNotificationHistory, getWindowsNotificationStatus } from "./api";
+import {
+  getBroadcastStatus,
+  getConfig,
+  getMacosNotificationStatus,
+  getManifest,
+  getNotificationHistory,
+  getServiceStatus,
+  getWindowsNotificationStatus,
+} from "./api";
 import { state } from "./state";
 
 export async function refreshState(): Promise<void> {
@@ -18,6 +26,12 @@ export async function refreshState(): Promise<void> {
     state.serviceHealthy = false;
   } finally {
     state.loading = false;
+  }
+
+  try {
+    state.serviceStatus = await getServiceStatus();
+  } catch {
+    state.serviceStatus = null;
   }
 
   try {
