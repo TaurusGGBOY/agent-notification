@@ -7,7 +7,7 @@ import { fileURLToPath } from "node:url";
 
 const repoRoot = dirname(dirname(fileURLToPath(import.meta.url)));
 const skillName = "agent-notify-discovery";
-const skillSource = join(repoRoot, "skills", skillName);
+const skillSource = join(repoRoot, "skills");
 const skillTarget = join(homedir(), ".claude", "skills", skillName);
 
 function run(command, args, options = {}) {

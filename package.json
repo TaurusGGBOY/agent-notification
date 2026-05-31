@@ -7,7 +7,12 @@
   },
   "files": [
     "scripts/install-skill.mjs",
-    "skills/agent-notify-discovery"
+    "skills/SKILL.md",
+    "skills/scripts",
+    "skills/install-skill.sh",
+    "skills/install-skill.ps1",
+    "skills/tests",
+    "skills/references"
   ],
   "license": "MIT"
 }
