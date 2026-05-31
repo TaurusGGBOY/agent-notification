@@ -19,6 +19,8 @@ type darwinNotificationRequest struct {
 	Sound    string
 }
 
+const darwinNotificationBundleIdentifier = "com.agentnotify.client"
+
 func NewToastNotifier(appName string) *ToastNotifier {
 	return &ToastNotifier{appName: appName}
 }
