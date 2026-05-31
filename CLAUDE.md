@@ -17,7 +17,6 @@ make run            # local run (non-Windows: toast stub)
 ```
 
 **Windows project path**: `D:\project\agent-notification`
-**Dev machine**: `Administrator@192.168.31.167` (SSH key configured)
 
 ## Architecture
 
@@ -46,12 +45,12 @@ scripts/install-skill.sh    Copy skill + zeroconf venv → ~/.claude/skills/
 ## Remote Windows Deployment
 
 ```bash
-# Deploy to Windows dev machine (192.168.31.167)
-scp windows-server/agent-notify-server.exe Administrator@192.168.31.167:C:/Users/Administrator/
-ssh Administrator@192.168.31.167 "cd C:/Users/Administrator && start /B agent-notify-server.exe"
+# Deploy to Windows dev machine
+scp windows-server/agent-notify-server.exe <user>@<host>:C:/Users/<user>/
+ssh <user>@<host> "cd C:/Users/<user> && start /B agent-notify-server.exe"
 ```
 
-**Dev machine**: `Administrator@192.168.31.167` (key already configured)
+**Dev machine**: `<user>@<host>` (SSH key configured)
 
 **Files**:
 - `toast_xml.go` - ToastGeneric XML generation (cross-platform)

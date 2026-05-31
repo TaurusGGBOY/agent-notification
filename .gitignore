@@ -6,3 +6,6 @@ tauri-app/src-tauri/binaries/agent-notify-server-*
 tauri-app/src-tauri/target/
 tauri-app/dist/
 tauri-app/node_modules/
+__pycache__/
+*.pyc
+.claude/settings.local.json

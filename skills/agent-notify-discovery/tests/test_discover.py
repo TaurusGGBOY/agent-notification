@@ -65,12 +65,12 @@ class DiscoverTests(unittest.TestCase):
                 discover.SCRIPT_DIR = original_script_dir
 
     def test_url_from_service_info_uses_ipv4_address_and_port(self):
-        info = FakeServiceInfo([socket.inet_aton("192.168.31.167")], port=17891)
+        info = FakeServiceInfo([socket.inet_aton("localhost")], port=17891)
 
-        self.assertEqual(discover.url_from_service_info(info), "http://192.168.31.167:17891")
+        self.assertEqual(discover.url_from_service_info(info), "http://localhost:17891")
 
     def test_discover_mdns_fetches_manifest_for_resolved_service(self):
-        fake_info = FakeServiceInfo([socket.inet_aton("192.168.31.167")], port=17891)
+        fake_info = FakeServiceInfo([socket.inet_aton("localhost")], port=17891)
         fake_zeroconf = FakeZeroconf(fake_info)
         fetched_urls = []
 
@@ -100,8 +100,8 @@ class DiscoverTests(unittest.TestCase):
             discover.load_zeroconf = original_loader
             discover.fetch_manifest = original_fetch
 
-        self.assertEqual(fetched_urls, ["http://192.168.31.167:17891"])
-        self.assertEqual(servers, [{"name": "Agent Notify Server", "url": "http://192.168.31.167:17891"}])
+        self.assertEqual(fetched_urls, ["http://localhost:17891"])
+        self.assertEqual(servers, [{"name": "Agent Notify Server", "url": "http://localhost:17891"}])
         self.assertTrue(fake_zeroconf.closed)
 
     def test_dns_sd_fallback_resolves_instance_to_ipv4_manifest(self):
@@ -111,17 +111,17 @@ class DiscoverTests(unittest.TestCase):
             if cmd[:2] == ["dns-sd", "-B"]:
                 return (
                     "Timestamp A/R Flags if Domain Service Type Instance Name\n"
-                    "23:01:13 Add 2 18 local. _agent-notify._tcp. Agent Notify PC-202305021618\n"
+                    "23:01:13 Add 2 18 local. _agent-notify._tcp. Agent Notify TEST-HOSTNAME\n"
                 )
             if cmd[:2] == ["dns-sd", "-L"]:
                 return (
-                    "Agent\\032Notify\\032PC-202305021618._agent-notify._tcp.local. "
-                    "can be reached at PC-202305021618.local.:17891 (interface 18)\n"
+                    "Agent\\032Notify\\032TEST-HOSTNAME._agent-notify._tcp.local. "
+                    "can be reached at TEST-HOSTNAME.local.:17891 (interface 18)\n"
                 )
             if cmd[:2] == ["dns-sd", "-G"]:
                 return (
-                    "PC-202305021618.local. 169.254.102.171 120\n"
-                    "PC-202305021618.local. 192.168.31.167 120\n"
+                    "TEST-HOSTNAME.local. 192.168.1.100 120\n"
+                    "TEST-HOSTNAME.local. localhost 120\n"
                 )
             return ""
 
@@ -141,22 +141,22 @@ class DiscoverTests(unittest.TestCase):
             discover.collect_pty_output = original_collect
             discover.fetch_manifest = original_fetch
 
-        self.assertEqual(fetched_urls, ["http://192.168.31.167:17891"])
-        self.assertEqual(servers, [{"name": "Agent Notify Server", "url": "http://192.168.31.167:17891"}])
+        self.assertEqual(fetched_urls, ["http://localhost:17891"])
+        self.assertEqual(servers, [{"name": "Agent Notify Server", "url": "http://localhost:17891"}])
 
     def test_listener_snapshot_deduplicates_under_lock(self):
         listener = discover.AgentNotifyListener()
         listener.urls = {
-            "Agent Notify._agent-notify._tcp.local.": "http://192.168.31.167:17891",
-            "Agent Notify duplicate._agent-notify._tcp.local.": "http://192.168.31.167:17891",
+            "Agent Notify._agent-notify._tcp.local.": "http://localhost:17891",
+            "Agent Notify duplicate._agent-notify._tcp.local.": "http://localhost:17891",
         }
 
-        self.assertEqual(listener.snapshot_urls(), ["http://192.168.31.167:17891"])
+        self.assertEqual(listener.snapshot_urls(), ["http://localhost:17891"])
 
     def test_manual_url_preserves_explicit_port(self):
-        self.assertEqual(discover.normalize_manual_url("192.168.31.167"), "http://192.168.31.167:17891")
-        self.assertEqual(discover.normalize_manual_url("192.168.31.167:17891"), "http://192.168.31.167:17891")
-        self.assertEqual(discover.normalize_manual_url("http://192.168.31.167:17891/"), "http://192.168.31.167:17891")
+        self.assertEqual(discover.normalize_manual_url("localhost"), "http://localhost:17891")
+        self.assertEqual(discover.normalize_manual_url("localhost:17891"), "http://localhost:17891")
+        self.assertEqual(discover.normalize_manual_url("http://localhost:17891/"), "http://localhost:17891")
 
 
 if __name__ == "__main__":
