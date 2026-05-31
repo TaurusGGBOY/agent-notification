@@ -152,29 +152,28 @@ func TestToastCardSummaryLinesPrioritizeEventAgentAndDirectory(t *testing.T) {
 	}
 }
 
-func TestCompactDirectoryForDisplayPreservesTailForDeepPaths(t *testing.T) {
-	unixPath := "/Users/me/work/company/platform/services/agent-notification/tauri-app/src"
-	got := compactDirectoryForDisplay(unixPath, 46)
-	if got != "/Users/me/.../agent-notification/tauri-app/src" {
-		t.Fatalf("unix compact path = %q", got)
+func TestLastFolderName(t *testing.T) {
+	tests := []struct {
+		name string
+		path string
+		want string
+	}{
+		{"unix path", "/Users/me/project", "project"},
+		{"windows path", `C:\Users\me\project`, "project"},
+		{"tilde path", "~/code", "code"},
+		{"trailing separator", "/home/user/", "user"},
+		{"root path", "/", "unknown"},
+		{"empty string", "", "unknown"},
+		{"whitespace", "  ", "unknown"},
+		{"single segment", "project", "project"},
+		{"deep path", "/a/b/c/d/e", "e"},
 	}
-
-	windowsPath := `C:\Users\me\work\company\platform\agent-notification\windows-server`
-	got = compactDirectoryForDisplay(windowsPath, 50)
-	if got != `C:\Users\me\...\agent-notification\windows-server` {
-		t.Fatalf("windows compact path = %q", got)
-	}
-}
-
-func TestCompactDirectoryForDisplayFallsBackToTailTruncation(t *testing.T) {
-	if got := compactDirectoryForDisplay("abcdef", 3); got != "def" {
-		t.Fatalf("small max compact path = %q, want def", got)
-	}
-	if got := compactDirectoryForDisplay("abcdef", 5); got != "...ef" {
-		t.Fatalf("tail compact path = %q, want ...ef", got)
-	}
-	if got := compactDirectoryForDisplay("abc", 5); got != "abc" {
-		t.Fatalf("short compact path = %q, want abc", got)
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			if got := lastFolderName(tt.path); got != tt.want {
+				t.Errorf("lastFolderName(%q) = %q, want %q", tt.path, got, tt.want)
+			}
+		})
 	}
 }
 
