@@ -4,7 +4,7 @@
 set -euo pipefail
 
 REPO_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
-SKILL_SOURCE="$REPO_ROOT/skills/agent-notify-discovery"
+SKILL_SOURCE="$REPO_ROOT/skills"
 SKILL_TARGET="$HOME/.claude/skills/agent-notify-discovery"
 
 if [ ! -d "$SKILL_SOURCE" ]; then

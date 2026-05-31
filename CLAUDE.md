@@ -32,14 +32,16 @@ windows-server/          Go HTTP server (Windows toast notifications)
   windows_test.go       Unit tests
   Makefile              cross-compile via GOOS=windows GOARCH=amd64
 
-skills/agent-notify-discovery/
-  scripts/discover.py          mDNS/DNS-SD discovery
-  scripts/send.py              POST /notify, stdin JSON, exit 0 on fail
+skills/
+  SKILL.md                   Skill manifest
+  install-skill.sh           Install skill + zeroconf venv to ~/.claude/skills/
+  install-skill.ps1          Windows installer
+  scripts/discover.py        mDNS/DNS-SD discovery
+  scripts/send.py            POST /notify, stdin JSON, exit 0 on fail
   scripts/configure_claude.py  Claude hook setup, idempotent
   scripts/configure_codex.py   Codex hook setup, idempotent
-  scripts/setup.py             One-command Claude/Codex setup
-
-scripts/install-skill.sh    Copy skill + zeroconf venv → ~/.claude/skills/
+  scripts/setup.py           One-command Claude/Codex setup
+  tests/                     Unit tests for skill scripts
 ```
 
 ## Remote Windows Deployment
