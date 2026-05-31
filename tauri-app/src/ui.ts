@@ -1,4 +1,5 @@
 import {
+  openMacosNotificationSettings,
   openWindowsNotificationSettings,
   sendTestNotification,
   setBroadcastEnabled,
@@ -20,17 +21,23 @@ export function render(): void {
   const serviceUrl = state.manifest?.url ?? "等待服务地址";
   const version = state.manifest?.version ?? "未知";
   const broadcastEnabled = state.broadcast?.enabled ?? false;
-  const windowsNotificationsEnabled = state.windowsNotifications?.enabled === true;
+
+  // 统一通知状态：优先使用当前平台的原生通知
+  const macosNotificationsSupported = state.macosNotifications?.supported === true;
   const windowsNotificationsSupported = state.windowsNotifications?.supported === true;
-  const windowsNotificationStatus = state.windowsNotificationError
+  const nativeNotificationsSupported = macosNotificationsSupported || windowsNotificationsSupported;
+  const nativeNotificationsEnabled = macosNotificationsSupported
+    ? state.macosNotifications?.enabled === true
+    : windowsNotificationsSupported
+      ? state.windowsNotifications?.enabled === true
+      : false;
+  const nativeNotificationStatus = state.macosNotificationError || state.windowsNotificationError
     ? "不可用"
-    : state.windowsNotifications
-      ? windowsNotificationsSupported
-        ? ""
-        : "仅 Windows"
-      : "检测中";
-  const windowsNotificationDisabled = !windowsNotificationsSupported || Boolean(state.windowsNotificationError);
-  const windowsNotificationTitle = windowsNotificationDisabled ? "当前环境不可用" : "打开 Windows 通知设置";
+    : nativeNotificationsSupported
+      ? ""
+      : "不支持";
+  const nativeNotificationDisabled = !nativeNotificationsSupported || Boolean(state.macosNotificationError || state.windowsNotificationError);
+  const nativeNotificationTitle = nativeNotificationDisabled ? "当前环境不可用" : "打开系统通知设置";
 
   app.innerHTML = `
     <section class="app-shell">
@@ -60,15 +67,15 @@ export function render(): void {
           </div>
           <div class="notification-row">
             <span class="summary-label">
-              Windows 通知
-              ${windowsNotificationStatus ? `<em>${escapeHtml(windowsNotificationStatus)}</em>` : ""}
+              允许通知
+              ${nativeNotificationStatus ? `<em>${escapeHtml(nativeNotificationStatus)}</em>` : ""}
             </span>
             <button
-              class="switch ${windowsNotificationsEnabled ? "on" : ""}"
-              data-action="windows-notifications"
-              title="${escapeHtml(windowsNotificationTitle)}"
-              aria-pressed="${windowsNotificationsEnabled}"
-              ${windowsNotificationDisabled ? "disabled" : ""}
+              class="switch ${nativeNotificationsEnabled ? "on" : ""}"
+              data-action="native-notifications"
+              title="${escapeHtml(nativeNotificationTitle)}"
+              aria-pressed="${nativeNotificationsEnabled}"
+              ${nativeNotificationDisabled ? "disabled" : ""}
             >
               <i></i>
             </button>
@@ -163,13 +170,23 @@ function bindEvents(): void {
     render();
   });
 
-  document.querySelector<HTMLButtonElement>('[data-action="windows-notifications"]')?.addEventListener("click", async () => {
-    if (state.windowsNotifications?.supported !== true) return;
+  document.querySelector<HTMLButtonElement>('[data-action="native-notifications"]')?.addEventListener("click", async () => {
+    const isMacos = state.macosNotifications?.supported === true;
+    const isWindows = state.windowsNotifications?.supported === true;
+    if (!isMacos && !isWindows) return;
     try {
-      await openWindowsNotificationSettings();
-      pollWindowsNotificationStatus();
+      if (isMacos) {
+        await openMacosNotificationSettings();
+      } else if (isWindows) {
+        await openWindowsNotificationSettings();
+      }
+      pollNativeNotificationStatus();
     } catch (err) {
-      state.windowsNotificationError = err instanceof Error ? err.message : String(err);
+      if (isMacos) {
+        state.macosNotificationError = err instanceof Error ? err.message : String(err);
+      } else {
+        state.windowsNotificationError = err instanceof Error ? err.message : String(err);
+      }
       render();
     }
   });
@@ -224,7 +241,7 @@ async function copySkillInstallCommand(): Promise<void> {
   }
 }
 
-function pollWindowsNotificationStatus(): void {
+function pollNativeNotificationStatus(): void {
   let attempts = 0;
   const refresh = async () => {
     attempts += 1;
