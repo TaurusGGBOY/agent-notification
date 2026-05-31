@@ -1,61 +1,159 @@
-//go:build darwin
+//go:build darwin && cgo
 
 package main
 
+/*
+#cgo CFLAGS: -x objective-c -Wno-deprecated-declarations
+#cgo LDFLAGS: -framework Foundation -framework Cocoa -framework UserNotifications
+#include <stdlib.h>
+#include <stdio.h>
+#import <Foundation/Foundation.h>
+#import <Cocoa/Cocoa.h>
+#import <UserNotifications/UserNotifications.h>
+
+// Initialize NSApplication as a background accessory (no Dock icon).
+// Must be called once before any notification API usage.
+static void agentnotify_init_app(void) {
+	[NSApplication sharedApplication];
+	[NSApp setActivationPolicy:NSApplicationActivationPolicyAccessory];
+}
+
+static int agentnotify_deliver_notification(
+	const char *title,
+	const char *subtitle,
+	const char *body,
+	const char *sound,
+	char *errbuf,
+	int errbuflen
+) {
+	@autoreleasepool {
+		@try {
+			UNUserNotificationCenter *center = [UNUserNotificationCenter currentNotificationCenter];
+
+			// Request authorization (returns immediately if already granted/denied).
+			__block BOOL authorized = NO;
+			__block BOOL authDone = NO;
+			[center requestAuthorizationWithOptions:(UNAuthorizationOptionAlert | UNAuthorizationOptionSound)
+				completionHandler:^(BOOL granted, NSError *error) {
+					authorized = granted;
+					authDone = YES;
+				}];
+
+			// Spin the run loop to process the authorization callback.
+			// On subsequent calls (already authorized/denied), this returns almost instantly.
+			for (int i = 0; i < 100 && !authDone; i++) {
+				[[NSRunLoop currentRunLoop] runUntilDate:
+					[NSDate dateWithTimeIntervalSinceNow:0.05]];
+			}
+
+			if (!authorized) {
+				if (errbuf != NULL && errbuflen > 0) {
+					snprintf(errbuf, errbuflen, "notification authorization not granted");
+				}
+				return 1;
+			}
+
+			// Build notification content.
+			UNMutableNotificationContent *content = [[UNMutableNotificationContent alloc] init];
+			content.title = [NSString stringWithUTF8String:title ? title : ""];
+			content.subtitle = [NSString stringWithUTF8String:subtitle ? subtitle : ""];
+			content.body = [NSString stringWithUTF8String:body ? body : ""];
+
+			NSString *soundName = [NSString stringWithUTF8String:sound ? sound : ""];
+			if ([soundName length] > 0) {
+				content.sound = [UNNotificationSound soundNamed:soundName];
+			} else {
+				content.sound = [UNNotificationSound defaultSound];
+			}
+
+			// Create an immediate trigger (timeInterval must be > 0).
+			UNTimeIntervalNotificationTrigger *trigger =
+				[UNTimeIntervalNotificationTrigger triggerWithTimeInterval:0.1 repeats:NO];
+
+			UNNotificationRequest *request = [UNNotificationRequest requestWithIdentifier:
+				[[NSUUID UUID] UUIDString]
+				content:content trigger:trigger];
+
+			// Synchronously add the notification request.
+			__block BOOL addDone = NO;
+			__block NSError *addError = nil;
+			[center addNotificationRequest:request withCompletionHandler:^(NSError *error) {
+				addError = error;
+				addDone = YES;
+			}];
+
+			// Spin the run loop to process the add-notification callback.
+			for (int i = 0; i < 60 && !addDone; i++) {
+				[[NSRunLoop currentRunLoop] runUntilDate:
+					[NSDate dateWithTimeIntervalSinceNow:0.05]];
+			}
+
+			if (addError != nil) {
+				if (errbuf != NULL && errbuflen > 0) {
+					snprintf(errbuf, errbuflen, "%s", [[addError localizedDescription] UTF8String]);
+				}
+				return 1;
+			}
+
+			// Brief additional spin so the system can render the notification.
+			[[NSRunLoop currentRunLoop] runUntilDate:
+				[NSDate dateWithTimeIntervalSinceNow:0.3]];
+
+			return 0;
+		} @catch (NSException *exception) {
+			if (errbuf != NULL && errbuflen > 0) {
+				snprintf(errbuf, errbuflen, "%s", [[exception reason] UTF8String]);
+			}
+			return 1;
+		}
+	}
+}
+*/
+import "C"
+
 import (
-	"log"
+	"fmt"
 	"strings"
+	"sync"
+	"unsafe"
 )
 
-// ToastNotifier sends native macOS notifications.
-type ToastNotifier struct {
-	appName string
+var appOnce sync.Once
+
+func ensureApp() {
+	appOnce.Do(func() {
+		C.agentnotify_init_app()
+	})
 }
 
-type darwinNotificationRequest struct {
-	Title    string
-	Subtitle string
-	Body     string
-	Sound    string
-}
+func deliverDarwinNotification(req darwinNotificationRequest) error {
+	ensureApp()
 
-func NewToastNotifier(appName string) *ToastNotifier {
-	return &ToastNotifier{appName: appName}
-}
+	title := C.CString(req.Title)
+	subtitle := C.CString(req.Subtitle)
+	body := C.CString(req.Body)
+	sound := C.CString(req.Sound)
+	errbuf := C.malloc(512)
+	defer C.free(unsafe.Pointer(title))
+	defer C.free(unsafe.Pointer(subtitle))
+	defer C.free(unsafe.Pointer(body))
+	defer C.free(unsafe.Pointer(sound))
+	defer C.free(errbuf)
 
-func (n *ToastNotifier) Notify(title, message string) error {
-	return n.NotifyWithStyle("clean", "stop", title, message, "")
-}
-
-func (n *ToastNotifier) NotifyWithStyle(style, event, title, message, agent string) error {
-	req := newDarwinNotificationRequest(event, title, message, agent, n.appName)
-	log.Printf("sending native macOS notification: title=%q subtitle=%q", req.Title, req.Subtitle)
-	if err := deliverDarwinNotification(req); err != nil {
-		log.Printf("native macOS notification failed: %v", err)
-		return err
+	result := C.agentnotify_deliver_notification(
+		title,
+		subtitle,
+		body,
+		sound,
+		(*C.char)(errbuf),
+		512,
+	)
+	if result != 0 {
+		msg := C.GoString((*C.char)(errbuf))
+		if strings.TrimSpace(msg) == "" {
+			msg = "unknown native notification error"
+		}
+		return fmt.Errorf("native macOS notification: %s", msg)
 	}
-	log.Printf("native macOS notification sent successfully")
 	return nil
-}
-
-func newDarwinNotificationRequest(event, title, body, agent, appName string) darwinNotificationRequest {
-	subtitle := strings.TrimSpace(agent)
-	if subtitle == "" {
-		subtitle = strings.TrimSpace(appName)
-	}
-	if subtitle == "" {
-		subtitle = "AgentNotify"
-	}
-
-	sound := "Glass"
-	if strings.EqualFold(strings.TrimSpace(event), "start") {
-		sound = "Hero"
-	}
-
-	return darwinNotificationRequest{
-		Title:    strings.TrimSpace(title),
-		Subtitle: subtitle,
-		Body:     strings.TrimSpace(body),
-		Sound:    sound,
-	}
 }
