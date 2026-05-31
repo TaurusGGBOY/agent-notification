@@ -287,6 +287,8 @@ def discover_mdns(timeout=3.0):
 def normalize_manual_url(value):
     if value.startswith("http://") or value.startswith("https://"):
         return value.rstrip("/")
+    if ":" in value:
+        return f"http://{value}".rstrip("/")
     return f"http://{value}:{HTTP_PORT}"
 
 
