@@ -13,5 +13,6 @@ if (
 const npx = process.platform === "win32" ? "npx.cmd" : "npx";
 execFileSync(npx, ["tauri", "build", ...process.argv.slice(2)], {
   env,
+  shell: process.platform === "win32",
   stdio: "inherit",
 });
