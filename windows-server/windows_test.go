@@ -39,6 +39,23 @@ func newTestServer(cfg *Config) *Server {
 	return server
 }
 
+func writeTestConfig(t *testing.T, configJSON string) {
+	t.Helper()
+	tmpDir := t.TempDir()
+	if runtime.GOOS == "darwin" {
+		t.Setenv("HOME", tmpDir)
+	} else {
+		t.Setenv("APPDATA", tmpDir)
+	}
+	dir := configDir()
+	if err := os.MkdirAll(dir, 0755); err != nil {
+		t.Fatalf("mkdir config dir failed: %v", err)
+	}
+	if err := os.WriteFile(filepath.Join(dir, configFile), []byte(configJSON), 0644); err != nil {
+		t.Fatalf("write config failed: %v", err)
+	}
+}
+
 // === Payload Validation Tests ===
 
 func TestNotifyHandler_ValidStartEvent(t *testing.T) {
@@ -170,12 +187,14 @@ func TestNotifyHandler_WrongMethod(t *testing.T) {
 }
 
 func TestNotifyHandler_DisabledEvent(t *testing.T) {
+	writeTestConfig(t, `{"notificationStyle":"clean","enabledEvents":["stop"],"futureOverrides":{}}`)
 	cfg := &Config{
 		NotificationStyle: "clean",
 		EnabledEvents:     []string{"stop"}, // start disabled
 		FutureOverrides:   make(map[string]string),
 	}
 	server := newTestServer(cfg)
+	notifier := server.notifier.(*recordingNotifier)
 
 	body := `{"agent":"test","event":"start"}`
 	req := httptest.NewRequest(http.MethodPost, "/notify", bytes.NewBufferString(body))
@@ -185,6 +204,33 @@ func TestNotifyHandler_DisabledEvent(t *testing.T) {
 
 	if w.Code != http.StatusNoContent {
 		t.Errorf("expected status %d for disabled event, got %d", http.StatusNoContent, w.Code)
+	}
+	if len(notifier.calls) != 0 {
+		t.Fatalf("notifications = %d, want 0", len(notifier.calls))
+	}
+}
+
+func TestNotifyHandler_TestNotificationBypassesDisabledEventFilter(t *testing.T) {
+	writeTestConfig(t, `{"notificationStyle":"clean","enabledEvents":["stop"],"futureOverrides":{}}`)
+	cfg := &Config{
+		NotificationStyle: "clean",
+		EnabledEvents:     []string{"stop"},
+		FutureOverrides:   make(map[string]string),
+	}
+	server := newTestServer(cfg)
+	notifier := server.notifier.(*recordingNotifier)
+
+	body := `{"agent":"tauri","event":"start","project":"AgentNotify","sourcePayload":{"agentNotifyTest":true}}`
+	req := httptest.NewRequest(http.MethodPost, "/notify", bytes.NewBufferString(body))
+	w := httptest.NewRecorder()
+
+	server.NotifyHandler(w, req)
+
+	if w.Code != http.StatusNoContent {
+		t.Fatalf("status = %d, want %d", w.Code, http.StatusNoContent)
+	}
+	if len(notifier.calls) != 1 {
+		t.Fatalf("notifications = %d, want 1", len(notifier.calls))
 	}
 }
 

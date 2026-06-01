@@ -239,7 +239,7 @@ func (s *Server) NotifyHandler(w http.ResponseWriter, r *http.Request) {
 	s.recordHistory(payload, event)
 
 	cfg := s.currentConfig()
-	if !cfg.IsEventEnabled(event) {
+	if !cfg.IsEventEnabled(event) && !isAgentNotifyTest(payload) {
 		w.WriteHeader(http.StatusNoContent)
 		return
 	}
@@ -262,6 +262,15 @@ func (s *Server) NotifyHandler(w http.ResponseWriter, r *http.Request) {
 	}
 
 	w.WriteHeader(http.StatusNoContent)
+}
+
+func isAgentNotifyTest(payload NotifyPayload) bool {
+	value, ok := payload.SourcePayload["agentNotifyTest"]
+	if !ok {
+		return false
+	}
+	enabled, ok := value.(bool)
+	return ok && enabled
 }
 
 func (s *Server) HistoryHandler(w http.ResponseWriter, r *http.Request) {

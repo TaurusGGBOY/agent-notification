@@ -124,7 +124,7 @@ export async function sendTestNotification(event: EventName = "start"): Promise<
     project: "AgentNotify",
     message: "来自 AgentNotify 的测试通知",
     timestamp: new Date().toISOString(),
-    sourcePayload: {},
+    sourcePayload: { agentNotifyTest: true },
   };
   const res = await fetch(`${BASE_URL}/notify`, {
     method: "POST",
