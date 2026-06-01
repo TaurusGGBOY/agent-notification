@@ -488,8 +488,8 @@ func TestHealthHandler(t *testing.T) {
 	if resp.Status != "ok" {
 		t.Errorf("expected status 'ok', got %q", resp.Status)
 	}
-	if resp.Version != "1.0.1" {
-		t.Errorf("expected version '1.0.1', got %q", resp.Version)
+	if resp.Version != "1.0.2" {
+		t.Errorf("expected version '1.0.2', got %q", resp.Version)
 	}
 }
 
@@ -537,8 +537,8 @@ func TestManifestHandler(t *testing.T) {
 	if resp.Protocol != "mdns-dns-sd" {
 		t.Errorf("expected protocol 'mdns-dns-sd', got %q", resp.Protocol)
 	}
-	if resp.Version != "1.0.1" {
-		t.Errorf("expected version '1.0.1', got %q", resp.Version)
+	if resp.Version != "1.0.2" {
+		t.Errorf("expected version '1.0.2', got %q", resp.Version)
 	}
 }
 
@@ -561,7 +561,7 @@ func TestHealthHandler_WrongMethod(t *testing.T) {
 func TestManifestResponse_Fields(t *testing.T) {
 	resp := ManifestResponse{
 		Name:            "Agent Notify Server",
-		Version:         "1.0.1",
+		Version:         "1.0.2",
 		URL:             "http://localhost:17891",
 		Hostname:        "test-host",
 		Protocol:        "mdns-dns-sd",
