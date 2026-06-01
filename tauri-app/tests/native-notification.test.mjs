@@ -54,6 +54,24 @@ test("macOS notification delivery does not force the app into the foreground", a
 
   assert.doesNotMatch(nativeNotification, /activateIgnoringOtherApps/);
   assert.doesNotMatch(nativeNotification, /activated app active/);
+  assert.doesNotMatch(nativeNotification, /UNTimeIntervalNotificationTrigger/);
+  assert.match(nativeNotification, /content:content\s+trigger:nil/);
+});
+
+test("test notification is marked so it always exercises native delivery", async () => {
+  const api = await readProjectFile("src/api.ts");
+
+  assert.match(api, /sourcePayload:\s*\{\s*agentNotifyTest:\s*true\s*\}/);
+});
+
+test("macOS build defaults to ad-hoc signing so notifications use the app bundle identity", async () => {
+  const packageJson = JSON.parse(await readProjectFile("package.json"));
+  const tauriBuild = await readProjectFile("scripts/tauri-build.mjs");
+
+  assert.equal(packageJson.scripts["tauri:build"], "npm run prepare:sidecar && node scripts/tauri-build.mjs");
+  assert.match(tauriBuild, /process\.platform === "darwin"/);
+  assert.match(tauriBuild, /env\.MACOS_RELEASE_MODE !== "signed"/);
+  assert.match(tauriBuild, /env\.APPLE_SIGNING_IDENTITY = "-"/);
 });
 
 test("macOS notification settings opens this app's notification detail page", async () => {

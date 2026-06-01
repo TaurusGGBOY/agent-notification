@@ -177,11 +177,9 @@ int agentnotify_show_app_notification(
 			content.body = agentnotify_string(body);
 			content.sound = [UNNotificationSound defaultSound];
 
-			UNTimeIntervalNotificationTrigger *trigger =
-				[UNTimeIntervalNotificationTrigger triggerWithTimeInterval:0.1 repeats:NO];
 			UNNotificationRequest *request = [UNNotificationRequest requestWithIdentifier:
 				[[NSUUID UUID] UUIDString]
-				content:content trigger:trigger];
+				content:content trigger:nil];
 
 			__block NSError *addError = nil;
 			dispatch_semaphore_t addSemaphore = dispatch_semaphore_create(0);
