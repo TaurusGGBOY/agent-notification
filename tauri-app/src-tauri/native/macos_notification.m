@@ -136,12 +136,6 @@ int agentnotify_show_app_notification(
 				[NSApp isActive],
 				(long)[NSApp activationPolicy]
 			);
-			if (![NSApp isActive]) {
-				[NSApp activateIgnoringOtherApps:YES];
-				[[NSRunLoop currentRunLoop] runUntilDate:
-					[NSDate dateWithTimeIntervalSinceNow:0.1]];
-				agentnotify_debug_log("activated app active=%d", [NSApp isActive]);
-			}
 			agentnotify_configure_notification_center();
 			UNUserNotificationCenter *center = [UNUserNotificationCenter currentNotificationCenter];
 			agentnotify_log_notification_settings(center);
