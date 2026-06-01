@@ -1,18 +1,18 @@
 ---
 name: agent-notify-discovery
-description: Use when users need to discover Agent Notify Windows servers or configure Claude Code or Codex start/stop notification hooks.
+description: Use when users need to discover Agent Notify Windows servers or configure Claude Code, Codex, or OpenClaw start/stop notification hooks.
 ---
 
 # Agent Notify Discovery Skill
 
-Discover Agent Notify Windows servers and configure agent hooks for Claude Code or Codex.
+Discover Agent Notify Windows servers and configure agent hooks for Claude Code, Codex, or OpenClaw.
 
 ## Default Workflow
 
 Do not only explain setup steps when this skill is invoked to configure notifications. Run the one-command setup script from this skill directory by default:
 
 ```bash
-python scripts/setup.py --agents claude codex --events start stop --test
+python scripts/setup.py --agents claude codex openclaw --events start stop --test
 ```
 
 Use an absolute path to `scripts/setup.py` if the current working directory is not this skill directory.
@@ -20,10 +20,10 @@ Use an absolute path to `scripts/setup.py` if the current working directory is n
 If discovery finds no server, ask the user for the Agent Notify URL, then rerun:
 
 ```bash
-python scripts/setup.py --url http://IP:17891 --agents claude codex --events start stop --test
+python scripts/setup.py --url http://IP:17891 --agents claude codex openclaw --events start stop --test
 ```
 
-If the user asks for a preview or safety check, run the same command with `--dry-run` first. If Codex asks to trust hooks, tell the user to review `~/.codex/hooks.json` before approving.
+If the user asks for a preview or safety check, run the same command with `--dry-run` first. If Codex asks to trust hooks, tell the user to review `~/.codex/hooks.json` before approving. OpenClaw changes require restarting the OpenClaw Gateway.
 
 ## Usage
 
@@ -43,15 +43,15 @@ python scripts/discover.py --timeout 5 --json
 ```
 
 ### setup.py
-One-command setup for Claude Code and Codex. Discovers a server when `--url` is omitted, writes hooks, and optionally sends a strict test notification.
+One-command setup for Claude Code, Codex, and OpenClaw. Discovers a server when `--url` is omitted, writes hooks/plugins, and optionally sends a strict test notification.
 
 ```
-python scripts/setup.py --url http://IP:17891 --agents claude codex --events start stop --test
+python scripts/setup.py --url http://IP:17891 --agents claude codex openclaw --events start stop --test
 ```
 
 ### send.py
 ```
-python scripts/send.py --url http://IP:17891 --agent claude|codex --event start|stop
+python scripts/send.py --url http://IP:17891 --agent claude|codex|openclaw --event start|stop
 ```
 Reads JSON from stdin when run as a hook. CLI args remain defaults unless stdin explicitly includes the same field. Exits 0 on network failure unless `--strict` is set.
 
@@ -68,10 +68,21 @@ python scripts/configure_codex.py \
   --events start stop
 ```
 
+### configure_openclaw.py
+Installs the Agent Notify OpenClaw plugin in `~/.openclaw/plugins/agent-notify` and enables it in `~/.openclaw/openclaw.json`.
+
+```
+python scripts/configure_openclaw.py \
+  --url http://IP:17891 \
+  --events start stop
+```
+
 ## Events
 
 - `start` → SessionStart hook
 - `stop` → Stop hook
+- OpenClaw `start` → `before_model_resolve` plugin hook
+- OpenClaw `stop` → `agent_end` plugin hook
 
 ## Hook Reference
 

@@ -65,12 +65,12 @@ class DiscoverTests(unittest.TestCase):
                 discover.SCRIPT_DIR = original_script_dir
 
     def test_url_from_service_info_uses_ipv4_address_and_port(self):
-        info = FakeServiceInfo([socket.inet_aton("localhost")], port=17891)
+        info = FakeServiceInfo([socket.inet_aton("127.0.0.1")], port=17891)
 
-        self.assertEqual(discover.url_from_service_info(info), "http://localhost:17891")
+        self.assertEqual(discover.url_from_service_info(info), "http://127.0.0.1:17891")
 
     def test_discover_mdns_fetches_manifest_for_resolved_service(self):
-        fake_info = FakeServiceInfo([socket.inet_aton("localhost")], port=17891)
+        fake_info = FakeServiceInfo([socket.inet_aton("127.0.0.1")], port=17891)
         fake_zeroconf = FakeZeroconf(fake_info)
         fetched_urls = []
 
@@ -100,8 +100,8 @@ class DiscoverTests(unittest.TestCase):
             discover.load_zeroconf = original_loader
             discover.fetch_manifest = original_fetch
 
-        self.assertEqual(fetched_urls, ["http://localhost:17891"])
-        self.assertEqual(servers, [{"name": "Agent Notify Server", "url": "http://localhost:17891"}])
+        self.assertEqual(fetched_urls, ["http://127.0.0.1:17891"])
+        self.assertEqual(servers, [{"name": "Agent Notify Server", "url": "http://127.0.0.1:17891"}])
         self.assertTrue(fake_zeroconf.closed)
 
     def test_dns_sd_fallback_resolves_instance_to_ipv4_manifest(self):
@@ -141,8 +141,8 @@ class DiscoverTests(unittest.TestCase):
             discover.collect_pty_output = original_collect
             discover.fetch_manifest = original_fetch
 
-        self.assertEqual(fetched_urls, ["http://localhost:17891"])
-        self.assertEqual(servers, [{"name": "Agent Notify Server", "url": "http://localhost:17891"}])
+        self.assertEqual(fetched_urls, ["http://192.168.1.100:17891"])
+        self.assertEqual(servers, [{"name": "Agent Notify Server", "url": "http://192.168.1.100:17891"}])
 
     def test_listener_snapshot_deduplicates_under_lock(self):
         listener = discover.AgentNotifyListener()

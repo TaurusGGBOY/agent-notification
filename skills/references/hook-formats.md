@@ -99,7 +99,7 @@ Hook input is JSON on stdin when the agent provides it. `send.py` uses explicit 
 
 ```json
 {
-  "agent": "claude|codex",
+  "agent": "claude|codex|openclaw",
   "event": "stop",
   "project": "agent-notification",
   "cwd": "/path/to/project",
@@ -109,6 +109,41 @@ Hook input is JSON on stdin when the agent provides it. `send.py` uses explicit 
 }
 ```
 
-## OpenClaw (Future)
+## OpenClaw
 
-OpenClaw uses hooks in `~/.openclaw/hooks/`.
+OpenClaw support is installed as a workspace plugin in `~/.openclaw/plugins/agent-notify` and enabled from `~/.openclaw/openclaw.json`.
+
+```json
+{
+  "plugins": {
+    "allow": ["agent-notify"],
+    "load": {
+      "paths": ["~/.openclaw/plugins/agent-notify"]
+    },
+    "entries": {
+      "agent-notify": {
+        "enabled": true,
+        "config": {
+          "serverUrl": "http://IP:17891",
+          "events": ["start", "stop"]
+        }
+      }
+    }
+  }
+}
+```
+
+The generated plugin registers:
+
+- `before_model_resolve` → `start`
+- `agent_end` → `stop`
+
+Use script:
+
+```bash
+python scripts/configure_openclaw.py \
+  --url http://IP:17891 \
+  --events start stop
+```
+
+Restart OpenClaw Gateway after changing the plugin or config.

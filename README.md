@@ -19,6 +19,7 @@ LAN-only notification receiver. Agents send `start`/`stop` events to AgentNotify
 **Skill** (`skills/agent-notify-discovery/`)
 - Configures Claude Code hooks in `~/.claude/settings.json`
 - Configures Codex hooks in `~/.codex/hooks.json`
+- Configures OpenClaw through an Agent Notify plugin in `~/.openclaw/plugins/agent-notify`
 - Run `/agent-notify-discovery` or use scripts directly
 
 ## Quick Start
@@ -53,12 +54,12 @@ In your agent, run the installed skill:
 
 Ask the skill to discover AgentNotify and configure notification hooks for your agent. It can configure both `start` and `stop` events; use `stop` if you only want a notification when a task finishes.
 
-One-command setup for Claude Code and Codex:
+One-command setup for Claude Code, Codex, and OpenClaw:
 
 ```bash
 python skills/agent-notify-discovery/scripts/setup.py \
   --url http://<agentnotify-ip>:17891 \
-  --agents claude codex \
+  --agents claude codex openclaw \
   --events start stop \
   --test
 ```
@@ -70,12 +71,12 @@ If discovery fails, copy the LAN URL shown in AgentNotify and pass it explicitly
 ```bash
 python skills/agent-notify-discovery/scripts/setup.py \
   --url http://<your-ip>:17891 \
-  --agents claude codex \
+  --agents claude codex openclaw \
   --events start stop \
   --test
 ```
 
-After setup, restart Claude Code or Codex so the new hooks take effect. If Codex asks whether to trust hooks, review `~/.codex/hooks.json` before approving.
+After setup, restart Claude Code or Codex so the new hooks take effect. Restart OpenClaw Gateway so the Agent Notify plugin is loaded. If Codex asks whether to trust hooks, review `~/.codex/hooks.json` before approving.
 
 ### 4. Confirm notifications
 
@@ -108,11 +109,19 @@ python skills/agent-notify-discovery/scripts/configure_codex.py \
   --events start stop
 ```
 
+OpenClaw:
+
+```bash
+python skills/agent-notify-discovery/scripts/configure_openclaw.py \
+  --url http://<agentnotify-ip>:17891 \
+  --events start stop
+```
+
 ## Windows One-Click App
 
 Windows users should install and start the Tauri app. The app opens the AgentNotify UI, starts the bundled Go server sidecar, listens on `0.0.0.0:17891` for LAN agent notifications, controls the server locally through `127.0.0.1:17891`, and advertises itself with mDNS.
 
-After opening the app, copy the LAN URL shown in the sidebar into the Claude/Codex setup skill, or let the skill discover the server automatically.
+After opening the app, copy the LAN URL shown in the sidebar into the Claude/Codex/OpenClaw setup skill, or let the skill discover the server automatically.
 
 ## Notification Styles
 
@@ -127,6 +136,8 @@ After opening the app, copy the LAN URL shown in the sidebar into the Claude/Cod
 |------------|-------------------|
 | `SessionStart` | `start` |
 | `Stop` | `stop` |
+| OpenClaw `before_model_resolve` | `start` |
+| OpenClaw `agent_end` | `stop` |
 
 ## Protocol
 
