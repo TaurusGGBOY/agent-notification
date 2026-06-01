@@ -162,11 +162,8 @@ pub fn ensure_sidecar(app: &AppHandle) -> Result<(), String> {
         ));
     }
 
-    if is_server_healthy() {
-        return Err(format!(
-            "port {} is already used by an external Agent Notify server; quit that process before starting AgentNotify",
-            control_addr()
-        ));
+    if is_server_healthy() && is_server_lan_reachable() {
+        return Ok(());
     }
 
     let mut command = app
