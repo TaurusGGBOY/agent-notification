@@ -19,7 +19,7 @@ func discoveryTXT() []string {
 	}
 }
 
-// StartMDNSAdvertisement is platform-specific: see mdns_zeroconf.go and mdns_windows.go.
+// StartMDNSAdvertisement advertises the notification service with mDNS/DNS-SD.
 
 type BroadcastController struct {
 	mu      sync.Mutex
