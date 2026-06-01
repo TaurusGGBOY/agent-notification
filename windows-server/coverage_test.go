@@ -296,6 +296,80 @@ func TestAgentInitialHandlesEmptyWhitespaceAndUnicode(t *testing.T) {
 	}
 }
 
+func TestNotificationForwarderHonorsTauriStdoutEnv(t *testing.T) {
+	t.Setenv(tauriNotificationEnvVar, "  "+tauriNotificationEnvValue+"  ")
+	if _, ok := newNotificationForwarder().(stdoutNotificationForwarder); !ok {
+		t.Fatal("expected stdout notification forwarder when Tauri stdout env is enabled")
+	}
+
+	t.Setenv(tauriNotificationEnvVar, "0")
+	if got := newNotificationForwarder(); got != nil {
+		t.Fatalf("forwarder = %#v, want nil when Tauri stdout env is disabled", got)
+	}
+}
+
+func TestFormatMessageUsesPathLikeProjectAsWorkdir(t *testing.T) {
+	tests := []struct {
+		name    string
+		payload NotifyPayload
+		want    string
+	}{
+		{
+			name: "start uses last folder from unix project path",
+			payload: NotifyPayload{
+				Event:   "start",
+				Project: "/Users/me/agent-notification",
+			},
+			want: "agent-notification 已启动",
+		},
+		{
+			name: "stop falls back when project is unknown",
+			payload: NotifyPayload{
+				Event:   "stop",
+				Project: "unknown",
+				Cwd:     `C:\Users\me\project`,
+			},
+			want: "project 已停止",
+		},
+		{
+			name: "start without project or workdir",
+			payload: NotifyPayload{
+				Event: "start",
+			},
+			want: "已启动",
+		},
+		{
+			name: "default event returns project name",
+			payload: NotifyPayload{
+				Event:   "other",
+				Project: "agent-notification",
+			},
+			want: "agent-notification",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			if got := formatMessage(tt.payload); got != tt.want {
+				t.Fatalf("formatMessage() = %q, want %q", got, tt.want)
+			}
+		})
+	}
+}
+
+func TestEventLabelTrimsCaseAndDefaults(t *testing.T) {
+	tests := map[string]string{
+		" start ": "START",
+		"STOP":    "STOP",
+		"pause":   "EVENT",
+	}
+	for input, want := range tests {
+		if got := eventLabel(input); got != want {
+			t.Fatalf("eventLabel(%q) = %q, want %q", input, got, want)
+		}
+	}
+}
+
 func TestFormatToastXMLAlwaysClean(t *testing.T) {
 	xml := formatToastXML("status-color", "start", "Agent Started", "message", "codex", "agent-notification", "")
 	if strings.Contains(xml, `STATUS ·`) || strings.Contains(xml, `<group>`) || strings.Contains(xml, `placement="hero"`) {
@@ -514,6 +588,51 @@ func TestSettingsHandlerInvalidJSONAndDirectoryFailure(t *testing.T) {
 	handler.ServeHTTP(w, req)
 	if w.Code != http.StatusInternalServerError {
 		t.Fatalf("directory failure status = %d, want %d", w.Code, http.StatusInternalServerError)
+	}
+}
+
+func TestSettingsHandlerPostFiltersUnsupportedUpdatesAndPersistsConfig(t *testing.T) {
+	tmpDir := t.TempDir()
+	if runtime.GOOS == "darwin" {
+		t.Setenv("HOME", tmpDir)
+	} else {
+		t.Setenv("APPDATA", tmpDir)
+	}
+	configPath := filepath.Join(tmpDir, "custom", "config.json")
+	handler := &SettingsHandler{configPath: configPath}
+
+	req := httptest.NewRequest(http.MethodPost, "/settings", bytes.NewBufferString(`{
+		"notificationStyle": "unsupported",
+		"enabledEvents": ["start", "invalid", "stop", "start", 42]
+	}`))
+	w := httptest.NewRecorder()
+	handler.ServeHTTP(w, req)
+	if w.Code != http.StatusNoContent {
+		t.Fatalf("POST /settings status = %d, want %d", w.Code, http.StatusNoContent)
+	}
+
+	data, err := os.ReadFile(configPath)
+	if err != nil {
+		t.Fatalf("read persisted config failed: %v", err)
+	}
+	var cfg Config
+	if err := json.Unmarshal(data, &cfg); err != nil {
+		t.Fatalf("decode persisted config failed: %v", err)
+	}
+	if cfg.NotificationStyle != "clean" {
+		t.Fatalf("notificationStyle = %q, want clean", cfg.NotificationStyle)
+	}
+	wantEvents := []string{"start", "stop"}
+	if len(cfg.EnabledEvents) != len(wantEvents) {
+		t.Fatalf("enabledEvents = %#v, want %#v", cfg.EnabledEvents, wantEvents)
+	}
+	for i, want := range wantEvents {
+		if cfg.EnabledEvents[i] != want {
+			t.Fatalf("enabledEvents = %#v, want %#v", cfg.EnabledEvents, wantEvents)
+		}
+	}
+	if cfg.FutureOverrides == nil {
+		t.Fatal("futureOverrides should be initialized when settings are persisted")
 	}
 }
 
