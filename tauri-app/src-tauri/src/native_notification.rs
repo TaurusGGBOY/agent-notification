@@ -10,6 +10,16 @@ mod imp {
             errbuf: *mut c_char,
             errbuflen: c_int,
         ) -> c_int;
+
+        fn agentnotify_configure_notification_center_early();
+    }
+
+    /// Register the UNUserNotificationCenter delegate as early as possible
+    /// so that `willPresentNotification:` is active before any notification is posted.
+    pub fn configure_delegate_early() {
+        unsafe {
+            agentnotify_configure_notification_center_early();
+        }
     }
 
     pub fn show(title: &str, body: &str) -> Result<(), String> {
@@ -49,3 +59,6 @@ mod imp {
 }
 
 pub use imp::show;
+
+#[cfg(target_os = "macos")]
+pub use imp::configure_delegate_early;

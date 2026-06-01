@@ -25,6 +25,30 @@ test("managed macOS sidecar notifications are shown by the app process", async (
   assert.doesNotMatch(nativeNotification, /NSUserNotification/);
 });
 
+test("macOS notification delegate is registered before startup notifications can fire", async () => {
+  const main = await readProjectFile("src-tauri/src/main.rs");
+  const nativeBindings = await readProjectFile("src-tauri/src/native_notification.rs");
+  const nativeNotification = await readProjectFile("src-tauri/native/macos_notification.m");
+
+  const setupIndex = main.indexOf(".setup(|app| {");
+  const delegateIndex = main.indexOf("native_notification::configure_delegate_early();");
+  const sidecarIndex = main.indexOf("service::ensure_sidecar(app.handle())");
+
+  assert.notEqual(setupIndex, -1);
+  assert.notEqual(delegateIndex, -1);
+  assert.notEqual(sidecarIndex, -1);
+  assert.ok(delegateIndex > setupIndex);
+  assert.ok(delegateIndex < sidecarIndex);
+
+  assert.match(nativeBindings, /fn agentnotify_configure_notification_center_early\(\);/);
+  assert.match(nativeBindings, /pub fn configure_delegate_early\(\)/);
+  assert.match(nativeNotification, /void agentnotify_configure_notification_center_early\(void\)/);
+  assert.match(
+    nativeNotification,
+    /static void agentnotify_configure_notification_center\(void\) \{[\s\S]*agentnotify_configure_notification_center_early\(\);[\s\S]*\}/,
+  );
+});
+
 test("macOS notification settings opens this app's notification detail page", async () => {
   const notificationSettings = await readProjectFile("src-tauri/src/notification_settings.rs");
   const config = JSON.parse(await readProjectFile("src-tauri/tauri.conf.json"));
