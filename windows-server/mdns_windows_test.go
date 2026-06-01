@@ -52,6 +52,7 @@ func TestStartMDNSAdvertisementKeepsDNSSDStdinOpen(t *testing.T) {
 	}
 
 	cancel()
+	waitForFile(t, exitedPath)
 }
 
 func runDNSSDHelperProcess() {
