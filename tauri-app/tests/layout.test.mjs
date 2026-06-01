@@ -60,6 +60,7 @@ test("npx install entrypoint installs the bundled discovery skill", async () => 
 
   assert.match(installer, /agent-notify-discovery/);
   assert.match(installer, /\.claude/);
+  assert.match(installer, /\.openclaw/);
   assert.match(installer, /zeroconf/);
 });
 

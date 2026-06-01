@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""One-command Agent Notify setup for Claude Code and Codex."""
+"""One-command Agent Notify setup for Claude Code, Codex, and OpenClaw."""
 
 import argparse
 import json
@@ -7,6 +7,7 @@ import sys
 
 import configure_claude
 import configure_codex
+import configure_openclaw
 import send
 
 discover = None
@@ -84,6 +85,22 @@ def configure_codex_agent(server_url, events, path_arg, dry_run):
         print(f"Codex hooks configured in {path}")
 
 
+def configure_openclaw_agent(server_url, events, config_path, plugin_dir, dry_run):
+    settings = configure_openclaw.configure_hooks(
+        config_path=config_path,
+        plugin_dir=plugin_dir,
+        server_url=server_url,
+        events=events,
+        dry_run=dry_run,
+    )
+    if dry_run:
+        print(f"\n# openclaw -> {configure_openclaw.openclaw_config_path(config_path)}")
+        print(json.dumps({"plugins": settings.get("plugins", {})}, indent=2))
+    else:
+        print(f"OpenClaw Agent Notify plugin installed in {configure_openclaw.openclaw_plugin_dir(plugin_dir)}")
+        print(f"OpenClaw config updated in {configure_openclaw.openclaw_config_path(config_path)}")
+
+
 def send_test_notification(server_url, agents):
     agent = "codex" if "codex" in agents else agents[0]
     return send.send_notification(
@@ -106,12 +123,22 @@ def run_setup(args):
         configure_claude_agent(server_url, args.events, args.scope, args.dry_run)
     if "codex" in args.agents:
         configure_codex_agent(server_url, args.events, args.codex_path, args.dry_run)
+    if "openclaw" in args.agents:
+        configure_openclaw_agent(
+            server_url,
+            args.events,
+            args.openclaw_config_path,
+            args.openclaw_plugin_dir,
+            args.dry_run,
+        )
 
     if args.dry_run:
         print("\nDry run only; no hook files written and no test notification sent.")
         return 0
 
     print("Restart Claude Code/Codex for hook changes to take effect.")
+    if "openclaw" in args.agents:
+        print("Restart OpenClaw Gateway for plugin changes to take effect.")
     print("If Codex asks to trust hooks, review ~/.codex/hooks.json before approving.")
 
     if args.test:
@@ -120,12 +147,14 @@ def run_setup(args):
 
 
 def build_parser():
-    parser = argparse.ArgumentParser(description="Configure Agent Notify hooks for Claude Code and Codex")
+    parser = argparse.ArgumentParser(description="Configure Agent Notify hooks for Claude Code, Codex, and OpenClaw")
     parser.add_argument("--url", default="", help="Agent Notify server URL; discovers or prompts when omitted")
-    parser.add_argument("--agents", nargs="+", default=["claude", "codex"], choices=["claude", "codex"])
+    parser.add_argument("--agents", nargs="+", default=["claude", "codex", "openclaw"], choices=["claude", "codex", "openclaw"])
     parser.add_argument("--events", nargs="+", default=["start", "stop"], choices=["start", "stop"])
     parser.add_argument("--scope", choices=["user", "project"], default="user", help="Claude hook scope")
     parser.add_argument("--codex-path", help="Codex hooks.json path; default is ~/.codex/hooks.json")
+    parser.add_argument("--openclaw-config-path", help="OpenClaw config path; default is ~/.openclaw/openclaw.json")
+    parser.add_argument("--openclaw-plugin-dir", help="OpenClaw plugin directory; default is ~/.openclaw/plugins/agent-notify")
     parser.add_argument("--dry-run", action="store_true", help="Print generated settings without writing files")
     parser.add_argument("--test", action="store_true", help="Send a strict test notification after saving hooks")
     parser.add_argument("--non-interactive", action="store_true", help="Do not prompt for URL if discovery fails")

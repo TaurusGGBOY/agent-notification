@@ -8,7 +8,10 @@ import { fileURLToPath } from "node:url";
 const repoRoot = dirname(dirname(fileURLToPath(import.meta.url)));
 const skillName = "agent-notify-discovery";
 const skillSource = join(repoRoot, "skills");
-const skillTarget = join(homedir(), ".claude", "skills", skillName);
+const skillTargets = [
+  join(homedir(), ".claude", "skills", skillName),
+  join(homedir(), ".openclaw", "skills", skillName),
+];
 
 function run(command, args, options = {}) {
   const result = spawnSync(command, args, { stdio: "inherit", ...options });
@@ -43,10 +46,25 @@ function findPython() {
   throw new Error("Python 3 is required to install the agent-notify-discovery skill.");
 }
 
-function venvPythonPath() {
+function venvPythonPath(skillTarget) {
   return process.platform === "win32"
     ? join(skillTarget, ".venv", "Scripts", "python.exe")
     : join(skillTarget, ".venv", "bin", "python");
+}
+
+function installSkill(skillTarget, python) {
+  mkdirSync(dirname(skillTarget), { recursive: true });
+  rmSync(skillTarget, { recursive: true, force: true });
+  cpSync(skillSource, skillTarget, { recursive: true });
+
+  run(python.command, [...python.prefixArgs, "-m", "venv", join(skillTarget, ".venv")]);
+
+  const venvPython = venvPythonPath(skillTarget);
+  run(venvPython, ["-m", "pip", "install", "--upgrade", "pip"]);
+  run(venvPython, ["-m", "pip", "install", "zeroconf"]);
+
+  console.log(`Installed ${skillName} skill at ${skillTarget}`);
+  return venvPython;
 }
 
 if (!existsSync(skillSource)) {
@@ -56,18 +74,10 @@ if (!existsSync(skillSource)) {
 const python = findPython();
 
 console.log(`Installing ${skillName} skill...`);
-mkdirSync(dirname(skillTarget), { recursive: true });
-rmSync(skillTarget, { recursive: true, force: true });
-cpSync(skillSource, skillTarget, { recursive: true });
-
-run(python.command, [...python.prefixArgs, "-m", "venv", join(skillTarget, ".venv")]);
-
-const venvPython = venvPythonPath();
-run(venvPython, ["-m", "pip", "install", "--upgrade", "pip"]);
-run(venvPython, ["-m", "pip", "install", "zeroconf"]);
-
-console.log(`Installed ${skillName} skill at ${skillTarget}`);
+const installedPythons = skillTargets.map((skillTarget) => installSkill(skillTarget, python));
 
 if (process.argv.includes("--test")) {
-  run(venvPython, [join(skillTarget, "scripts", "discover.py"), "--json"]);
+  for (const [index, skillTarget] of skillTargets.entries()) {
+    run(installedPythons[index], [join(skillTarget, "scripts", "discover.py"), "--json"]);
+  }
 }

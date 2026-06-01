@@ -23,7 +23,7 @@ def load_setup_module():
 
 
 class SetupTests(unittest.TestCase):
-    def test_setup_writes_claude_and_codex_hooks(self):
+    def test_setup_writes_claude_codex_and_openclaw_hooks(self):
         setup = load_setup_module()
         with tempfile.TemporaryDirectory() as home:
             old_home = os.environ.get("HOME")
@@ -31,10 +31,12 @@ class SetupTests(unittest.TestCase):
             try:
                 args = Namespace(
                     url="http://localhost:17891",
-                    agents=["claude", "codex"],
+                    agents=["claude", "codex", "openclaw"],
                     events=["start", "stop"],
                     scope="user",
                     codex_path=None,
+                    openclaw_config_path=None,
+                    openclaw_plugin_dir=None,
                     dry_run=False,
                     test=False,
                     non_interactive=True,
@@ -45,8 +47,13 @@ class SetupTests(unittest.TestCase):
                 self.assertEqual(result, 0)
                 claude_settings = json.loads(Path(home, ".claude", "settings.json").read_text())
                 codex_hooks = json.loads(Path(home, ".codex", "hooks.json").read_text())
+                openclaw_config = json.loads(Path(home, ".openclaw", "openclaw.json").read_text())
                 self.assertIn("--agent claude", claude_settings["hooks"]["Stop"][0]["hooks"][0]["command"])
                 self.assertIn("--agent codex", codex_hooks["hooks"]["Stop"][0]["hooks"][0]["command"])
+                self.assertEqual(
+                    openclaw_config["plugins"]["entries"]["agent-notify"]["config"]["serverUrl"],
+                    "http://localhost:17891",
+                )
             finally:
                 if old_home is None:
                     os.environ.pop("HOME", None)
@@ -61,10 +68,12 @@ class SetupTests(unittest.TestCase):
             try:
                 args = Namespace(
                     url="http://localhost:17891",
-                    agents=["claude", "codex"],
+                    agents=["claude", "codex", "openclaw"],
                     events=["start", "stop"],
                     scope="user",
                     codex_path=None,
+                    openclaw_config_path=None,
+                    openclaw_plugin_dir=None,
                     dry_run=True,
                     test=False,
                     non_interactive=True,
@@ -75,6 +84,7 @@ class SetupTests(unittest.TestCase):
                 self.assertEqual(result, 0)
                 self.assertFalse(Path(home, ".claude", "settings.json").exists())
                 self.assertFalse(Path(home, ".codex", "hooks.json").exists())
+                self.assertFalse(Path(home, ".openclaw", "openclaw.json").exists())
             finally:
                 if old_home is None:
                     os.environ.pop("HOME", None)
@@ -99,6 +109,8 @@ class SetupTests(unittest.TestCase):
                     events=["stop"],
                     scope="user",
                     codex_path=None,
+                    openclaw_config_path=None,
+                    openclaw_plugin_dir=None,
                     dry_run=True,
                     test=False,
                     non_interactive=True,
@@ -148,6 +160,8 @@ class SetupTests(unittest.TestCase):
             events=["stop"],
             scope="user",
             codex_path=None,
+            openclaw_config_path=None,
+            openclaw_plugin_dir=None,
             dry_run=True,
             test=False,
             non_interactive=True,

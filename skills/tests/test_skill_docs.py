@@ -11,7 +11,8 @@ class SkillDocsTests(unittest.TestCase):
 
         self.assertIn("## Default Workflow", text)
         self.assertIn("scripts/setup.py", text)
-        self.assertIn("--agents claude codex", text)
+        self.assertIn("--agents claude codex openclaw", text)
+        self.assertIn("configure_openclaw.py", text)
         self.assertIn("Do not only explain", text)
 
 
