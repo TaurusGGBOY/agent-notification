@@ -49,6 +49,13 @@ test("macOS notification delegate is registered before startup notifications can
   );
 });
 
+test("macOS notification delivery does not force the app into the foreground", async () => {
+  const nativeNotification = await readProjectFile("src-tauri/native/macos_notification.m");
+
+  assert.doesNotMatch(nativeNotification, /activateIgnoringOtherApps/);
+  assert.doesNotMatch(nativeNotification, /activated app active/);
+});
+
 test("macOS notification settings opens this app's notification detail page", async () => {
   const notificationSettings = await readProjectFile("src-tauri/src/notification_settings.rs");
   const config = JSON.parse(await readProjectFile("src-tauri/tauri.conf.json"));
