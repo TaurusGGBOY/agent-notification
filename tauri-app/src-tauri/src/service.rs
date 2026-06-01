@@ -162,7 +162,7 @@ pub fn ensure_sidecar(app: &AppHandle) -> Result<(), String> {
         ));
     }
 
-    if is_server_healthy() && is_server_lan_reachable() {
+    if is_server_healthy() {
         return Ok(());
     }
 
