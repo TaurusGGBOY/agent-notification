@@ -64,13 +64,17 @@ static NSString *agentnotify_string(const char *value) {
 
 static AgentNotifyAppNotificationDelegate *agentnotifyNotificationDelegate = nil;
 
-static void agentnotify_configure_notification_center(void) {
+void agentnotify_configure_notification_center_early(void) {
 	static dispatch_once_t once;
 	dispatch_once(&once, ^{
 		agentnotifyNotificationDelegate = [[AgentNotifyAppNotificationDelegate alloc] init];
 		[[UNUserNotificationCenter currentNotificationCenter] setDelegate:agentnotifyNotificationDelegate];
-		agentnotify_debug_log("notification center delegate configured");
+		agentnotify_debug_log("notification center delegate configured (early)");
 	});
+}
+
+static void agentnotify_configure_notification_center(void) {
+	agentnotify_configure_notification_center_early();
 }
 
 static void agentnotify_log_notification_settings(UNUserNotificationCenter *center) {

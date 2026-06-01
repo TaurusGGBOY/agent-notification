@@ -43,6 +43,10 @@ fn main() {
         .setup(|app| {
             #[cfg(target_os = "macos")]
             app.set_activation_policy(tauri::ActivationPolicy::Accessory);
+            // Register the notification delegate as early as possible so that
+            // willPresentNotification: is active before any notification is posted.
+            #[cfg(target_os = "macos")]
+            native_notification::configure_delegate_early();
             if let Err(err) = service::ensure_sidecar(app.handle()) {
                 eprintln!("AgentNotify sidecar startup warning: {err}");
             }
