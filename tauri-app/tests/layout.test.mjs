@@ -134,3 +134,13 @@ test("dashboard keeps history contained after adding the install command card", 
   assert.match(styles, /\.history-card\s*{[^}]*overflow:\s*hidden;/s);
   assert.match(styles, /\.history-list\s*{[^}]*overflow:\s*auto;/s);
 });
+
+test("dashboard keeps notification history fresh while the app is open", async () => {
+  const main = await readProjectFile("src/main.ts");
+  const service = await readProjectFile("src/service.ts");
+
+  assert.match(service, /export function startAutoRefresh/);
+  assert.match(service, /window\.setInterval\(\s*\(\)\s*=>\s*\{/);
+  assert.match(service, /void refreshState\(\)\.then\(render\)/);
+  assert.match(main, /startAutoRefresh\(render\)/);
+});
