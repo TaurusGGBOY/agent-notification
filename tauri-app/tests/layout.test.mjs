@@ -44,13 +44,16 @@ test("Windows sidecar build uses GUI subsystem", async () => {
   assert.match(releaseWorkflow, /go build -ldflags "-H=windowsgui" -o agent-notify-server-arm64\.exe/);
 });
 
-test("Windows startup removes legacy standalone server launchers before managing sidecar", async () => {
+test("Windows startup removes legacy autostart and only stops the server owning the port", async () => {
   const service = await readProjectFile("src-tauri/src/service.rs");
 
   assert.match(service, /cleanup_windows_legacy_server_autostart\(\)/);
   assert.match(service, /stop_windows_standalone_server_processes\(\)/);
   assert.match(service, /AgentNotifyServer/);
-  assert.match(service, /taskkill/);
+  assert.match(service, /Get-NetTCPConnection -LocalPort \{port\} -State Listen/);
+  assert.match(service, /Get-Process -Id \$connection\.OwningProcess/);
+  assert.match(service, /Stop-Process -Id \$process\.Id -Force/);
+  assert.doesNotMatch(service, /\/IM",\s*"agent-notify-server\.exe"/);
   assert.match(service, /CREATE_NO_WINDOW/);
 });
 

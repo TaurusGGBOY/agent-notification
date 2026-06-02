@@ -16,6 +16,8 @@ use crate::native_notification;
 const CONTROL_ADDR: &str = "127.0.0.1:17891";
 // This LAN-only tool intentionally exposes the entire unauthenticated Agent Notify HTTP API on the LAN.
 const SIDECAR_LISTEN_ADDR: &str = "0.0.0.0:17891";
+#[cfg(windows)]
+const SERVER_PORT: u16 = 17891;
 const NOTIFICATION_STDOUT_PREFIX: &str = "AGENT_NOTIFY_TAURI_NOTIFICATION ";
 #[cfg(windows)]
 const CREATE_NO_WINDOW: u32 = 0x0800_0000;
@@ -126,7 +128,17 @@ fn cleanup_windows_legacy_server_autostart() {
 
 #[cfg(windows)]
 fn stop_windows_standalone_server_processes() {
-    run_hidden_windows_command("taskkill", &["/F", "/T", "/IM", "agent-notify-server.exe"]);
+    let script = windows_stop_port_owner_script(SERVER_PORT, "agent-notify-server");
+    run_hidden_windows_command(
+        "powershell",
+        &[
+            "-NoProfile",
+            "-ExecutionPolicy",
+            "Bypass",
+            "-Command",
+            &script,
+        ],
+    );
 }
 
 #[cfg(windows)]
@@ -135,6 +147,20 @@ fn run_hidden_windows_command(program: &str, args: &[&str]) {
         .args(args)
         .creation_flags(CREATE_NO_WINDOW)
         .status();
+}
+
+#[cfg(any(windows, test))]
+fn windows_stop_port_owner_script(port: u16, process_name: &str) -> String {
+    let process_name = process_name.replace('\'', "''");
+    format!(
+        "$connections = Get-NetTCPConnection -LocalPort {port} -State Listen -ErrorAction SilentlyContinue; \
+         foreach ($connection in $connections) {{ \
+           $process = Get-Process -Id $connection.OwningProcess -ErrorAction SilentlyContinue; \
+           if ($process -and $process.ProcessName -eq '{process_name}') {{ \
+             Stop-Process -Id $process.Id -Force; \
+           }} \
+         }}"
+    )
 }
 
 pub fn ensure_sidecar(app: &AppHandle) -> Result<(), String> {
@@ -366,7 +392,8 @@ mod tests {
 
     use super::{
         control_addr, health_instance_token_matches, wait_for_managed_server_ready_with,
-        parse_forwarded_notification_line, sidecar_listen_addr, SidecarStdoutRouter,
+        parse_forwarded_notification_line, sidecar_listen_addr, windows_stop_port_owner_script,
+        SidecarStdoutRouter,
     };
 
     #[test]
@@ -394,6 +421,17 @@ mod tests {
     #[test]
     fn managed_service_readiness_does_not_require_lan_self_connect() {
         assert!(wait_for_managed_server_ready_with(Duration::ZERO, || true));
+    }
+
+    #[test]
+    fn windows_standalone_cleanup_targets_port_owner_only() {
+        let script = windows_stop_port_owner_script(17891, "agent-notify-server");
+
+        assert!(script.contains("Get-NetTCPConnection -LocalPort 17891 -State Listen"));
+        assert!(script.contains("Get-Process -Id $connection.OwningProcess"));
+        assert!(script.contains("$process.ProcessName -eq 'agent-notify-server'"));
+        assert!(script.contains("Stop-Process -Id $process.Id -Force"));
+        assert!(!script.contains("/IM agent-notify-server.exe"));
     }
 
     #[test]
