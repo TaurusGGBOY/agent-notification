@@ -34,6 +34,14 @@ test("notification surface does not expose style or preview controls", async () 
   assert.match(api, /export type NotificationStyle = "clean";/);
 });
 
+test("dashboard does not expose a manual refresh action", async () => {
+  const ui = await readProjectFile("src/ui.ts");
+
+  assert.doesNotMatch(ui, /data-action="refresh"/);
+  assert.doesNotMatch(ui, /refresh:\s*"刷新"/);
+  assert.doesNotMatch(ui, /refresh:\s*"Refresh"/);
+});
+
 test("Windows sidecar build uses GUI subsystem", async () => {
   const prepareSidecar = await readProjectFile("scripts/prepare-sidecar.mjs");
   const releaseWorkflow = await readProjectFile("../.github/workflows/release.yml");
