@@ -66,6 +66,39 @@ class SendTests(unittest.TestCase):
         self.assertEqual(captured["payload"]["agent"], "openclaw")
         self.assertEqual(captured["payload"]["event"], "stop")
 
+    def test_send_notification_includes_language(self):
+        captured = {}
+
+        class FakeResponse:
+            status = 204
+
+            def __enter__(self):
+                return self
+
+            def __exit__(self, exc_type, exc, tb):
+                return False
+
+        def fake_urlopen(req, timeout):
+            captured["payload"] = json.loads(req.data.decode("utf-8"))
+            return FakeResponse()
+
+        original_urlopen = send.urllib.request.urlopen
+        send.urllib.request.urlopen = fake_urlopen
+        try:
+            with contextlib.redirect_stdout(io.StringIO()):
+                result = send.send_notification(
+                    "http://127.0.0.1:17891",
+                    "codex",
+                    "start",
+                    language="en",
+                    strict=True,
+                )
+        finally:
+            send.urllib.request.urlopen = original_urlopen
+
+        self.assertEqual(result, 0)
+        self.assertEqual(captured["payload"]["language"], "en")
+
 
 if __name__ == "__main__":
     unittest.main()

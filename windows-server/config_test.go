@@ -29,3 +29,21 @@ func TestConfigNormalizeFiltersEvents(t *testing.T) {
 		}
 	}
 }
+
+func TestConfigNormalizeLanguage(t *testing.T) {
+	cfg := &Config{
+		NotificationStyle: "clean",
+		EnabledEvents:     []string{"start", "stop"},
+		Language:          "fr",
+	}
+	cfg.Normalize()
+	if cfg.Language != "zh" {
+		t.Fatalf("Language = %q, want zh", cfg.Language)
+	}
+
+	cfg.Language = " EN "
+	cfg.Normalize()
+	if cfg.Language != "en" {
+		t.Fatalf("Language = %q, want en", cfg.Language)
+	}
+}

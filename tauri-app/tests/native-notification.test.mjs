@@ -111,6 +111,6 @@ test("Windows notification settings action seeds the app in notification setting
 
   assert.match(
     ui,
-    /else if \(isWindows\) \{[\s\S]*await sendTestNotification\("start"\);[\s\S]*await openWindowsNotificationSettings\(\);[\s\S]*\}/,
+    /else if \(isWindows\) \{[\s\S]*await sendTestNotification\("start", currentLanguage\(\)\);[\s\S]*await openWindowsNotificationSettings\(\);[\s\S]*\}/,
   );
 });

@@ -1,6 +1,7 @@
 import {
   openMacosNotificationSettings,
   openWindowsNotificationSettings,
+  saveConfig,
   sendTestNotification,
   setBroadcastEnabled,
 } from "./api";
@@ -12,21 +13,143 @@ import { getCurrentWindow } from "@tauri-apps/api/window";
 const SKILL_INSTALL_COMMAND = "npx skills add TaurusGGBOY/agent-notification";
 let currentTheme: AppTheme = getInitialTheme();
 
+type TranslationKey =
+  | "address"
+  | "allowNotifications"
+  | "broadcast"
+  | "broadcastNotice"
+  | "cannotConnect"
+  | "copied"
+  | "copy"
+  | "copyFailed"
+  | "copyInstallCommand"
+  | "external"
+  | "history"
+  | "historyLoadFailed"
+  | "installCommand"
+  | "installCommandHint"
+  | "language"
+  | "nativeUnavailable"
+  | "noHistory"
+  | "noMessage"
+  | "notificationConsole"
+  | "notificationHistory"
+  | "offline"
+  | "online"
+  | "openSystemNotificationSettings"
+  | "recentNotifications"
+  | "refresh"
+  | "service"
+  | "serviceSubtitle"
+  | "start"
+  | "stop"
+  | "test"
+  | "themeToggle"
+  | "unknown"
+  | "unknownProject"
+  | "unsupported"
+  | "version";
+
+const translations: Record<"zh" | "en", Record<TranslationKey, string>> = {
+  zh: {
+    address: "地址",
+    allowNotifications: "允许通知",
+    broadcast: "广播",
+    broadcastNotice: "17891 端口由外部 Agent Notify 服务占用，退出客户端不会关闭该服务。",
+    cannotConnect: "无法连接本地通知服务",
+    copied: "已复制",
+    copy: "复制",
+    copyFailed: "复制失败",
+    copyInstallCommand: "复制安装 skill 命令",
+    external: "外部",
+    history: "历史",
+    historyLoadFailed: "历史加载失败",
+    installCommand: "安装 skill 命令",
+    installCommandHint: "在 Agent 环境中运行后安装通知发现 skill",
+    language: "语言",
+    nativeUnavailable: "当前环境不可用",
+    noHistory: "暂无通知记录",
+    noMessage: "无内容",
+    notificationConsole: "通知控制台",
+    notificationHistory: "通知历史",
+    offline: "离线",
+    online: "在线",
+    openSystemNotificationSettings: "打开系统通知设置",
+    recentNotifications: "最近 3 次通知请求",
+    refresh: "刷新",
+    service: "服务",
+    serviceSubtitle: "本机 Agent 通知服务、广播和历史",
+    start: "启动",
+    stop: "停止",
+    test: "测试",
+    themeToggle: "切换明暗模式",
+    unknown: "未知",
+    unknownProject: "未知项目",
+    unsupported: "不支持",
+    version: "版本",
+  },
+  en: {
+    address: "Address",
+    allowNotifications: "Notifications",
+    broadcast: "Broadcast",
+    broadcastNotice: "Port 17891 is used by an external Agent Notify service. Closing the client will not stop it.",
+    cannotConnect: "Cannot connect to the local notification service",
+    copied: "Copied",
+    copy: "Copy",
+    copyFailed: "Copy failed",
+    copyInstallCommand: "Copy skill install command",
+    external: "External",
+    history: "History",
+    historyLoadFailed: "Failed to load history",
+    installCommand: "Install skill command",
+    installCommandHint: "Run this in an agent environment to install the notification discovery skill",
+    language: "Language",
+    nativeUnavailable: "Unavailable in this environment",
+    noHistory: "No notifications yet",
+    noMessage: "No message",
+    notificationConsole: "Notification Console",
+    notificationHistory: "Notification History",
+    offline: "Offline",
+    online: "Online",
+    openSystemNotificationSettings: "Open system notification settings",
+    recentNotifications: "Last 3 notification requests",
+    refresh: "Refresh",
+    service: "Service",
+    serviceSubtitle: "Local agent notification service, broadcast, and history",
+    start: "Start",
+    stop: "Stop",
+    test: "Test",
+    themeToggle: "Toggle theme",
+    unknown: "Unknown",
+    unknownProject: "Unknown project",
+    unsupported: "Unsupported",
+    version: "Version",
+  },
+};
+
+function currentLanguage(): "zh" | "en" {
+  return state.config?.language === "en" ? "en" : "zh";
+}
+
+function t(key: TranslationKey): string {
+  return translations[currentLanguage()][key];
+}
+
 export function render(): void {
   const app = document.querySelector("#app") as HTMLElement;
   if (!app) {
     throw new Error("missing #app root");
   }
 
-  const serviceUrl = state.manifest?.url ?? "等待服务地址";
-  const version = state.manifest?.version ?? "未知";
+  const serviceUrl = state.manifest?.url ?? (currentLanguage() === "en" ? "Waiting for service URL" : "等待服务地址");
+  const version = state.manifest?.version ?? t("unknown");
   const broadcastEnabled = state.broadcast?.enabled ?? false;
   const serviceManagedByTauri = state.serviceStatus?.managed_by_tauri !== false;
   const serviceStatusLabel = state.serviceHealthy
     ? serviceManagedByTauri
-      ? "在线"
-      : "外部"
-    : "离线";
+      ? t("online")
+      : t("external")
+    : t("offline");
 
   // 统一通知状态：优先使用当前平台的原生通知
   const macosNotificationsSupported = state.macosNotifications?.supported === true;
@@ -38,12 +161,13 @@ export function render(): void {
       ? state.windowsNotifications?.enabled === true
       : false;
   const nativeNotificationStatus = state.macosNotificationError || state.windowsNotificationError
-    ? "不可用"
+    ? t("nativeUnavailable")
     : nativeNotificationsSupported
       ? ""
-      : "不支持";
+      : t("unsupported");
   const nativeNotificationDisabled = !nativeNotificationsSupported || Boolean(state.macosNotificationError || state.windowsNotificationError);
-  const nativeNotificationTitle = nativeNotificationDisabled ? "当前环境不可用" : "打开系统通知设置";
+  const nativeNotificationTitle = nativeNotificationDisabled ? t("nativeUnavailable") : t("openSystemNotificationSettings");
+  const nextLanguage = currentLanguage() === "zh" ? "en" : "zh";
 
   app.innerHTML = `
     <section class="app-shell">
@@ -52,28 +176,28 @@ export function render(): void {
           <div class="brand-icon">A</div>
           <div>
             <strong>AgentNotify</strong>
-            <span>通知控制台</span>
+            <span>${t("notificationConsole")}</span>
           </div>
         </div>
 
         <section class="side-summary">
           <div>
-            <span>服务</span>
+            <span>${t("service")}</span>
             <strong>${serviceStatusLabel}</strong>
           </div>
           <div class="address-row">
-            <span>地址</span>
+            <span>${t("address")}</span>
             <strong class="side-address">${escapeHtml(serviceUrl)}</strong>
           </div>
           <div class="broadcast-row">
-            <span>广播</span>
+            <span>${t("broadcast")}</span>
             <button class="switch ${broadcastEnabled ? "on" : ""}" data-action="broadcast" ${state.broadcastError ? "disabled" : ""}>
               <i></i>
             </button>
           </div>
           <div class="notification-row">
             <span class="summary-label">
-              允许通知
+              ${t("allowNotifications")}
               ${nativeNotificationStatus ? `<em>${escapeHtml(nativeNotificationStatus)}</em>` : ""}
             </span>
             <button
@@ -87,16 +211,16 @@ export function render(): void {
             </button>
           </div>
           <div class="button-row">
-            <button class="primary" data-action="test">测试</button>
-            <button data-action="refresh">刷新</button>
+            <button class="primary" data-action="test">${t("test")}</button>
+            <button data-action="refresh">${t("refresh")}</button>
           </div>
         </section>
 
         <div class="traffic-card">
           <div class="sparkline" aria-hidden="true"><span></span><span></span></div>
           <dl>
-            <dt>历史</dt><dd>${state.history.length}</dd>
-            <dt>版本</dt><dd>v${escapeHtml(version)}</dd>
+            <dt>${t("history")}</dt><dd>${state.history.length}</dd>
+            <dt>${t("version")}</dt><dd>v${escapeHtml(version)}</dd>
           </dl>
         </div>
       </aside>
@@ -104,33 +228,34 @@ export function render(): void {
       <main class="main-surface">
         <header class="topbar">
           <div class="topbar-title drag-region" data-drag-region>
-            <h1>通知控制台</h1>
-            <p>本机 Agent 通知服务、广播和历史</p>
+            <h1>${t("notificationConsole")}</h1>
+            <p>${t("serviceSubtitle")}</p>
           </div>
           <div class="top-actions">
+            <button class="language-button" data-action="language" title="${t("language")}">${nextLanguage.toUpperCase()}</button>
             <div class="about-control">
-              <button class="icon-button about-button" data-action="about" type="button" aria-label="关于 AgentNotify">
+              <button class="icon-button about-button" data-action="about" type="button" aria-label="${currentLanguage() === "en" ? "About AgentNotify" : "关于 AgentNotify"}">
                 i
               </button>
-              <section class="about-popover" aria-label="关于 AgentNotify">
-                <h2>关于 AgentNotify</h2>
-                <p>本机 Agent 通知服务，用于接收 Agent 任务开始和结束通知。</p>
+              <section class="about-popover" aria-label="${currentLanguage() === "en" ? "About AgentNotify" : "关于 AgentNotify"}">
+                <h2>${currentLanguage() === "en" ? "About AgentNotify" : "关于 AgentNotify"}</h2>
+                <p>${currentLanguage() === "en" ? "Local agent notification service for task start and completion events." : "本机 Agent 通知服务，用于接收 Agent 任务开始和结束通知。"}</p>
                 <dl>
-                  <div><dt>版本</dt><dd>v${escapeHtml(version)}</dd></div>
-                  <div><dt>服务</dt><dd>${escapeHtml(serviceStatusLabel)}</dd></div>
-                  <div><dt>地址</dt><dd>${escapeHtml(serviceUrl)}</dd></div>
+                  <div><dt>${t("version")}</dt><dd>v${escapeHtml(version)}</dd></div>
+                  <div><dt>${t("service")}</dt><dd>${escapeHtml(serviceStatusLabel)}</dd></div>
+                  <div><dt>${t("address")}</dt><dd>${escapeHtml(serviceUrl)}</dd></div>
                   <div><dt>Skill</dt><dd>${escapeHtml(SKILL_INSTALL_COMMAND)}</dd></div>
                 </dl>
               </section>
             </div>
-            <button class="icon-button" data-action="theme" title="切换明暗模式">${currentTheme === "light" ? "☾" : "☀"}</button>
+            <button class="icon-button" data-action="theme" title="${t("themeToggle")}">${currentTheme === "light" ? "☾" : "☀"}</button>
           </div>
         </header>
 
         ${state.error ? `<section class="notice">${escapeHtml(formatError(state.error))}</section>` : ""}
         ${
           state.serviceHealthy && !serviceManagedByTauri
-            ? `<section class="notice">17891 端口由外部 Agent Notify 服务占用，退出客户端不会关闭该服务。</section>`
+            ? `<section class="notice">${t("broadcastNotice")}</section>`
             : ""
         }
 
@@ -139,14 +264,14 @@ export function render(): void {
             <div class="card-head">
               <div class="card-icon green">⌘</div>
               <div>
-                <h2>安装 skill 命令</h2>
-                <p>在 Agent 环境中运行后安装通知发现 skill</p>
+                <h2>${t("installCommand")}</h2>
+                <p>${t("installCommandHint")}</p>
               </div>
             </div>
             <div class="command-copy-row">
               <code>${escapeHtml(SKILL_INSTALL_COMMAND)}</code>
-              <button class="copy-button" data-action="copy-skill-install-command" type="button" aria-label="复制安装 skill 命令">
-                复制
+              <button class="copy-button" data-action="copy-skill-install-command" type="button" aria-label="${t("copyInstallCommand")}">
+                ${t("copy")}
               </button>
             </div>
           </section>
@@ -155,8 +280,8 @@ export function render(): void {
             <div class="card-head">
               <div class="card-icon blue">◷</div>
               <div>
-                <h2>通知历史</h2>
-                <p>最近 3 次通知请求</p>
+                <h2>${t("notificationHistory")}</h2>
+                <p>${t("recentNotifications")}</p>
               </div>
             </div>
             <div class="history-list">
@@ -173,7 +298,7 @@ export function render(): void {
 
 function bindEvents(): void {
   document.querySelector<HTMLButtonElement>('[data-action="test"]')?.addEventListener("click", async () => {
-    await sendTestNotification("start");
+    await sendTestNotification("start", currentLanguage());
     await refreshState();
     render();
   });
@@ -186,6 +311,14 @@ function bindEvents(): void {
   document.querySelector<HTMLButtonElement>('[data-action="theme"]')?.addEventListener("click", () => {
     currentTheme = toggleTheme(currentTheme);
     applyTheme(currentTheme);
+    render();
+  });
+
+  document.querySelector<HTMLButtonElement>('[data-action="language"]')?.addEventListener("click", async () => {
+    if (!state.config) return;
+    const nextLanguage = currentLanguage() === "zh" ? "en" : "zh";
+    await saveConfig({ ...state.config, language: nextLanguage });
+    await refreshState();
     render();
   });
 
@@ -204,7 +337,7 @@ function bindEvents(): void {
       if (isMacos) {
         await openMacosNotificationSettings();
       } else if (isWindows) {
-        await sendTestNotification("start");
+        await sendTestNotification("start", currentLanguage());
         await openWindowsNotificationSettings();
       }
       pollNativeNotificationStatus();
@@ -223,15 +356,15 @@ function bindEvents(): void {
     button.disabled = true;
     try {
       await copySkillInstallCommand();
-      button.textContent = "已复制";
+      button.textContent = t("copied");
       button.classList.add("copied");
     } catch {
-      button.textContent = "复制失败";
+      button.textContent = t("copyFailed");
       button.classList.remove("copied");
     }
     window.setTimeout(() => {
       button.disabled = false;
-      button.textContent = "复制";
+      button.textContent = t("copy");
       button.classList.remove("copied");
     }, 1400);
   });
@@ -288,10 +421,10 @@ function pollNativeNotificationStatus(): void {
 
 function historyMarkup(): string {
   if (state.historyError) {
-    return `<div class="empty-history">历史加载失败</div>`;
+    return `<div class="empty-history">${t("historyLoadFailed")}</div>`;
   }
   if (state.history.length === 0) {
-    return `<div class="empty-history">暂无通知记录</div>`;
+    return `<div class="empty-history">${t("noHistory")}</div>`;
   }
   return state.history
     .slice(0, 3)
@@ -299,8 +432,8 @@ function historyMarkup(): string {
       (item) => `
         <article class="history-item">
           <time>${formatTime(item.time)}</time>
-          <strong>${escapeHtml(item.project || item.agent || "未知项目")}</strong>
-          <span>${item.event === "start" ? "启动" : "停止"} · ${escapeHtml(item.message || item.agent || "无内容")}</span>
+          <strong>${escapeHtml(item.project || item.agent || t("unknownProject"))}</strong>
+          <span>${item.event === "start" ? t("start") : t("stop")} · ${escapeHtml(item.message || item.agent || t("noMessage"))}</span>
         </article>
       `,
     )
@@ -310,11 +443,11 @@ function historyMarkup(): string {
 function formatTime(value: string): string {
   const date = new Date(value);
   if (Number.isNaN(date.getTime())) return "--:--";
-  return date.toLocaleTimeString("zh-CN", { hour: "2-digit", minute: "2-digit" });
+  return date.toLocaleTimeString(currentLanguage() === "en" ? "en-US" : "zh-CN", { hour: "2-digit", minute: "2-digit" });
 }
 
 function formatError(value: string): string {
-  if (value === "Failed to fetch") return "无法连接本地通知服务";
+  if (value === "Failed to fetch") return t("cannotConnect");
   return value;
 }
 

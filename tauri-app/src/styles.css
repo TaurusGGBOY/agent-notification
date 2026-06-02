@@ -401,6 +401,19 @@ button {
   transform: translateY(0);
 }
 
+.language-button {
+  min-width: 48px;
+  height: 42px;
+  padding: 0 12px;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  background: var(--card);
+  color: var(--text);
+  font-size: 13px;
+  font-weight: 700;
+  letter-spacing: 0;
+}
+
 .service-pill {
   display: inline-flex;
   align-items: center;

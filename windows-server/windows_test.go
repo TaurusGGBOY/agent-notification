@@ -234,6 +234,53 @@ func TestNotifyHandler_TestNotificationBypassesDisabledEventFilter(t *testing.T)
 	}
 }
 
+func TestNotifyHandler_UsesConfiguredEnglishNotificationLanguage(t *testing.T) {
+	writeTestConfig(t, `{"notificationStyle":"clean","enabledEvents":["start","stop"],"language":"en","futureOverrides":{}}`)
+	server := newTestServer(DefaultConfig())
+	notifier := server.notifier.(*recordingNotifier)
+
+	body := `{"agent":"codex","event":"stop","project":"agent-notification"}`
+	req := httptest.NewRequest(http.MethodPost, "/notify", bytes.NewBufferString(body))
+	w := httptest.NewRecorder()
+
+	server.NotifyHandler(w, req)
+
+	if w.Code != http.StatusNoContent {
+		t.Fatalf("status = %d, want %d", w.Code, http.StatusNoContent)
+	}
+	if len(notifier.calls) != 1 {
+		t.Fatalf("notifications = %d, want 1", len(notifier.calls))
+	}
+	if notifier.calls[0].title != "Agent Complete" {
+		t.Fatalf("title = %q, want Agent Complete", notifier.calls[0].title)
+	}
+	if notifier.calls[0].message != "agent-notification stopped" {
+		t.Fatalf("message = %q, want agent-notification stopped", notifier.calls[0].message)
+	}
+}
+
+func TestNotifyHandler_PayloadLanguageOverridesConfiguredLanguage(t *testing.T) {
+	writeTestConfig(t, `{"notificationStyle":"clean","enabledEvents":["start","stop"],"language":"zh","futureOverrides":{}}`)
+	server := newTestServer(DefaultConfig())
+	notifier := server.notifier.(*recordingNotifier)
+
+	body := `{"agent":"codex","event":"start","project":"agent-notification","language":"en"}`
+	req := httptest.NewRequest(http.MethodPost, "/notify", bytes.NewBufferString(body))
+	w := httptest.NewRecorder()
+
+	server.NotifyHandler(w, req)
+
+	if w.Code != http.StatusNoContent {
+		t.Fatalf("status = %d, want %d", w.Code, http.StatusNoContent)
+	}
+	if len(notifier.calls) != 1 {
+		t.Fatalf("notifications = %d, want 1", len(notifier.calls))
+	}
+	if notifier.calls[0].title != "Agent Started" {
+		t.Fatalf("title = %q, want Agent Started", notifier.calls[0].title)
+	}
+}
+
 func TestNotifyHandler_ReloadsConfigAndNormalizesStyle(t *testing.T) {
 	tmpDir := t.TempDir()
 	oldAppData := os.Getenv("APPDATA")

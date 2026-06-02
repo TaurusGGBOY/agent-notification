@@ -67,7 +67,7 @@ h2{color:#fff;font-size:1.1rem;margin:1.5rem 0 .75rem}
 <div id="toastResult" class="hidden"></div>
 
 <script>
-let config = {notificationStyle:'clean', enabledEvents:['start','stop'], futureOverrides:{}};
+let config = {notificationStyle:'clean', enabledEvents:['start','stop'], language:'zh', futureOverrides:{}};
 
 async function loadConfig() {
   try {
@@ -103,6 +103,7 @@ async function saveSettings() {
   const saveData = {
     notificationStyle: 'clean',
     enabledEvents: config.enabledEvents,
+    language: config.language || 'zh',
     futureOverrides: config.futureOverrides || {}
   };
 
@@ -205,6 +206,9 @@ func (h *SettingsHandler) handlePost(w http.ResponseWriter, r *http.Request) {
 			}
 		}
 	}
+	if language, ok := updates["language"].(string); ok && IsSupportedLanguage(language) {
+		cfg.Language = language
+	}
 
 	// Normalize and ensure valid state
 	cfg.Normalize()
@@ -249,6 +253,7 @@ func (h *ConfigHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	cfgMap := map[string]interface{}{
 		"notificationStyle": cfg.NotificationStyle,
 		"enabledEvents":     cfg.EnabledEvents,
+		"language":          cfg.Language,
 		"futureOverrides":   cfg.FutureOverrides,
 		"_path":             h.getConfigPath(),
 	}
