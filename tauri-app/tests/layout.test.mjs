@@ -68,6 +68,19 @@ test("dashboard exposes a copyable skill install command", async () => {
   assert.deepEqual(rootPackage.bin, { "agent-notification": "scripts/install-skill.mjs" });
 });
 
+test("topbar exposes about details on hover and keyboard focus", async () => {
+  const ui = await readProjectFile("src/ui.ts");
+  const styles = await readProjectFile("src/styles.css");
+
+  assert.match(ui, /data-action="about"/);
+  assert.match(ui, /关于 AgentNotify/);
+  assert.match(ui, /本机 Agent 通知服务/);
+  assert.match(ui, /<dt>版本<\/dt><dd>v\$\{escapeHtml\(version\)\}<\/dd>/);
+  assert.match(styles, /\.about-control\s*{/);
+  assert.match(styles, /\.about-popover\s*{[^}]*position:\s*absolute;/s);
+  assert.match(styles, /\.about-control:is\(:hover,\s*:focus-within\)\s+\.about-popover\s*{/);
+});
+
 test("npx install entrypoint installs the bundled discovery skill", async () => {
   const installer = await readProjectFile("../scripts/install-skill.mjs");
 

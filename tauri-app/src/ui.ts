@@ -108,6 +108,21 @@ export function render(): void {
             <p>本机 Agent 通知服务、广播和历史</p>
           </div>
           <div class="top-actions">
+            <div class="about-control">
+              <button class="icon-button about-button" data-action="about" type="button" aria-label="关于 AgentNotify">
+                i
+              </button>
+              <section class="about-popover" aria-label="关于 AgentNotify">
+                <h2>关于 AgentNotify</h2>
+                <p>本机 Agent 通知服务，用于接收 Agent 任务开始和结束通知。</p>
+                <dl>
+                  <div><dt>版本</dt><dd>v${escapeHtml(version)}</dd></div>
+                  <div><dt>服务</dt><dd>${escapeHtml(serviceStatusLabel)}</dd></div>
+                  <div><dt>地址</dt><dd>${escapeHtml(serviceUrl)}</dd></div>
+                  <div><dt>Skill</dt><dd>${escapeHtml(SKILL_INSTALL_COMMAND)}</dd></div>
+                </dl>
+              </section>
+            </div>
             <button class="icon-button" data-action="theme" title="切换明暗模式">${currentTheme === "light" ? "☾" : "☀"}</button>
           </div>
         </header>
