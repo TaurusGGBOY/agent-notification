@@ -6,6 +6,7 @@ import {
   saveConfig,
   sendTestNotification,
   setBroadcastEnabled,
+  setStartupEnabled,
 } from "./api";
 import { refreshState } from "./service";
 import { state } from "./state";
@@ -47,6 +48,7 @@ type TranslationKey =
   | "service"
   | "serviceSubtitle"
   | "start"
+  | "startupAtLogin"
   | "stop"
   | "test"
   | "themeToggle"
@@ -93,6 +95,7 @@ const translations: Record<"zh" | "en", Record<TranslationKey, string>> = {
     service: "服务",
     serviceSubtitle: "本机 Agent 通知服务、广播和历史",
     start: "启动",
+    startupAtLogin: "开机自启",
     stop: "停止",
     test: "测试",
     themeToggle: "切换明暗模式",
@@ -138,6 +141,7 @@ const translations: Record<"zh" | "en", Record<TranslationKey, string>> = {
     service: "Service",
     serviceSubtitle: "Local agent notification service, broadcast, and history",
     start: "Start",
+    startupAtLogin: "Start at login",
     stop: "Stop",
     test: "Test",
     themeToggle: "Toggle theme",
@@ -170,6 +174,8 @@ export function render(): void {
   const serviceUrl = state.manifest?.url ?? (currentLanguage() === "en" ? "Waiting for service URL" : "等待服务地址");
   const version = state.manifest?.version ?? t("unknown");
   const broadcastEnabled = state.broadcast?.enabled ?? false;
+  const startupEnabled = state.startup?.enabled ?? false;
+  const startupSupported = state.startup?.supported === true;
   const serviceManagedByTauri = state.serviceStatus?.managed_by_tauri !== false;
   const serviceStatusLabel = state.serviceHealthy
     ? serviceManagedByTauri
@@ -195,6 +201,8 @@ export function render(): void {
       : t("unsupported");
   const nativeNotificationDisabled = !nativeNotificationsSupported || Boolean(state.macosNotificationError || state.windowsNotificationError);
   const nativeNotificationTitle = nativeNotificationDisabled ? t("nativeUnavailable") : t("openSystemNotificationSettings");
+  const startupStatus = state.startupError ? t("nativeUnavailable") : startupSupported ? "" : t("unsupported");
+  const startupDisabled = !startupSupported || Boolean(state.startupError);
   const nextLanguage = currentLanguage() === "zh" ? "en" : "zh";
 
   app.innerHTML = `
@@ -220,6 +228,20 @@ export function render(): void {
           <div class="broadcast-row">
             <span>${t("broadcast")}</span>
             <button class="switch ${broadcastEnabled ? "on" : ""}" data-action="broadcast" ${state.broadcastError ? "disabled" : ""}>
+              <i></i>
+            </button>
+          </div>
+          <div class="startup-row">
+            <span class="summary-label">
+              ${t("startupAtLogin")}
+              ${startupStatus ? `<em>${escapeHtml(startupStatus)}</em>` : ""}
+            </span>
+            <button
+              class="switch ${startupEnabled ? "on" : ""}"
+              data-action="startup"
+              aria-pressed="${startupEnabled}"
+              ${startupDisabled ? "disabled" : ""}
+            >
               <i></i>
             </button>
           </div>
@@ -372,6 +394,17 @@ function bindEvents(): void {
     const next = !(state.broadcast?.enabled ?? false);
     state.broadcast = await setBroadcastEnabled(next);
     await refreshState();
+    render();
+  });
+
+  document.querySelector<HTMLButtonElement>('[data-action="startup"]')?.addEventListener("click", async () => {
+    const next = !(state.startup?.enabled ?? false);
+    try {
+      state.startup = await setStartupEnabled(next);
+      await refreshState();
+    } catch (err) {
+      state.startupError = err instanceof Error ? err.message : String(err);
+    }
     render();
   });
 

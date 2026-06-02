@@ -4,6 +4,7 @@ mod lifecycle;
 mod native_notification;
 mod notification_settings;
 mod service;
+mod startup;
 mod tray;
 
 use tauri::{Manager, Theme};
@@ -40,6 +41,8 @@ fn main() {
             notification_settings::macos_notification_status,
             service::service_status,
             service::restart_service,
+            startup::startup_status,
+            startup::set_startup_enabled,
             set_app_theme
         ])
         .setup(|app| {

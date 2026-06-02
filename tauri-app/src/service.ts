@@ -5,6 +5,7 @@ import {
   getManifest,
   getNotificationHistory,
   getServiceStatus,
+  getStartupStatus,
   getWindowsNotificationStatus,
 } from "./api";
 import { state } from "./state";
@@ -14,6 +15,7 @@ export async function refreshState(): Promise<void> {
   state.error = "";
   state.historyError = "";
   state.broadcastError = "";
+  state.startupError = "";
   state.windowsNotificationError = "";
   state.macosNotificationError = "";
   try {
@@ -45,6 +47,13 @@ export async function refreshState(): Promise<void> {
   } catch (err) {
     state.broadcast = null;
     state.broadcastError = err instanceof Error ? err.message : String(err);
+  }
+
+  try {
+    state.startup = await getStartupStatus();
+  } catch (err) {
+    state.startup = null;
+    state.startupError = err instanceof Error ? err.message : String(err);
   }
 
   try {
