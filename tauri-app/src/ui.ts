@@ -11,6 +11,7 @@ import { refreshState } from "./service";
 import { state } from "./state";
 import { applyTheme, getInitialTheme, toggleTheme, type AppTheme } from "./theme";
 import { getCurrentWindow } from "@tauri-apps/api/window";
+import agentNotifyIconUrl from "./assets/agentnotify-icon.png";
 
 const SKILL_INSTALL_COMMAND = "npx skills add TaurusGGBOY/agent-notification";
 let currentTheme: AppTheme = getInitialTheme();
@@ -201,7 +202,7 @@ export function render(): void {
     <section class="app-shell">
       <aside class="sidebar">
         <div class="brand drag-region" data-drag-region>
-          <div class="brand-icon">A</div>
+          <img class="brand-icon" src="${agentNotifyIconUrl}" alt="" aria-hidden="true" />
           <div>
             <strong>AgentNotify</strong>
             <span>${t("notificationConsole")}</span>

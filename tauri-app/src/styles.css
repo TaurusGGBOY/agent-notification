@@ -107,11 +107,11 @@ button {
 }
 
 .brand-icon {
+  display: block;
   width: 38px;
   height: 38px;
-  border-radius: 10px;
-  background: linear-gradient(135deg, #0f7cff, #62b4ff);
-  color: #fff;
+  border-radius: 8px;
+  object-fit: cover;
 }
 
 .brand strong {
