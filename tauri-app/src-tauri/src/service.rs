@@ -78,6 +78,27 @@ fn health_instance_token_matches(body: &str, expected_token: &str) -> bool {
     health.get("instanceToken").and_then(|value| value.as_str()) == Some(expected_token)
 }
 
+fn manifest_is_agent_notify_server(body: &str) -> bool {
+    let Ok(manifest) = serde_json::from_str::<serde_json::Value>(body) else {
+        return false;
+    };
+    manifest.get("name").and_then(|value| value.as_str()) == Some("Agent Notify Server")
+        && manifest.get("serviceType").and_then(|value| value.as_str())
+            == Some("_agent-notify._tcp.local.")
+}
+
+#[cfg_attr(not(windows), allow(dead_code))]
+fn is_agent_notify_server_healthy() -> bool {
+    let client = match Client::new(control_addr(), Duration::from_millis(600)) {
+        Ok(c) => c,
+        Err(_) => return false,
+    };
+    match client.get_text("/manifest") {
+        Ok(body) => manifest_is_agent_notify_server(&body),
+        Err(_) => false,
+    }
+}
+
 fn is_managed_server_healthy(instance_token: &str) -> bool {
     let client = match Client::new(control_addr(), Duration::from_millis(600)) {
         Ok(c) => c,
@@ -130,6 +151,20 @@ fn stop_windows_standalone_server_processes() {
 }
 
 #[cfg(windows)]
+fn stop_windows_agent_notify_server_on_control_port() {
+    run_hidden_windows_command(
+        "powershell",
+        &[
+            "-NoProfile",
+            "-ExecutionPolicy",
+            "Bypass",
+            "-Command",
+            "$conn = Get-NetTCPConnection -LocalPort 17891 -State Listen -ErrorAction SilentlyContinue; if ($conn) { $conn | ForEach-Object { Stop-Process -Id $_.OwningProcess -Force -ErrorAction SilentlyContinue } }",
+        ],
+    );
+}
+
+#[cfg(windows)]
 fn run_hidden_windows_command(program: &str, args: &[&str]) {
     let _ = std::process::Command::new(program)
         .args(args)
@@ -162,13 +197,24 @@ pub fn ensure_sidecar(app: &AppHandle) -> Result<(), String> {
     #[cfg(windows)]
     {
         if is_server_healthy() {
-            stop_windows_standalone_server_processes();
-            let _ = wait_for_server_to_stop(Duration::from_secs(2));
+            if is_agent_notify_server_healthy() {
+                stop_windows_standalone_server_processes();
+                stop_windows_agent_notify_server_on_control_port();
+                let _ = wait_for_server_to_stop(Duration::from_secs(2));
+            } else {
+                return Err(format!(
+                    "{} is already in use by another HTTP service",
+                    control_addr()
+                ));
+            }
         }
     }
 
     if is_server_healthy() {
-        return Ok(());
+        return Err(format!(
+            "Agent Notify server on {} did not stop before sidecar startup",
+            control_addr()
+        ));
     }
 
     let mut command = app
@@ -365,8 +411,9 @@ mod tests {
     use std::time::Duration;
 
     use super::{
-        control_addr, health_instance_token_matches, wait_for_managed_server_ready_with,
-        parse_forwarded_notification_line, sidecar_listen_addr, SidecarStdoutRouter,
+        control_addr, health_instance_token_matches, manifest_is_agent_notify_server,
+        parse_forwarded_notification_line, sidecar_listen_addr, wait_for_managed_server_ready_with,
+        SidecarStdoutRouter,
     };
 
     #[test]
@@ -389,6 +436,23 @@ mod tests {
         assert!(!health_instance_token_matches(external, "token-123"));
         assert!(!health_instance_token_matches(other_instance, "token-123"));
         assert!(!health_instance_token_matches(managed, ""));
+    }
+
+    #[test]
+    fn manifest_identifies_agent_notify_server() {
+        let manifest = r#"{"name":"Agent Notify Server","serviceType":"_agent-notify._tcp.local.","version":"1.0.7"}"#;
+
+        assert!(manifest_is_agent_notify_server(manifest));
+    }
+
+    #[test]
+    fn manifest_rejects_other_http_services() {
+        let wrong_name = r#"{"name":"Other Server","serviceType":"_agent-notify._tcp.local."}"#;
+        let wrong_service = r#"{"name":"Agent Notify Server","serviceType":"_http._tcp.local."}"#;
+
+        assert!(!manifest_is_agent_notify_server(wrong_name));
+        assert!(!manifest_is_agent_notify_server(wrong_service));
+        assert!(!manifest_is_agent_notify_server("not json"));
     }
 
     #[test]
