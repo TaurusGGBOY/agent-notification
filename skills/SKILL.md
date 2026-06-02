@@ -57,6 +57,35 @@ python scripts/send.py --url http://IP:17891 --agent claude|codex|openclaw --eve
 ```
 Reads JSON from stdin when run as a hook. CLI args remain defaults unless stdin explicitly includes the same field. `language` accepts `zh` or `en`; when omitted, the server's configured notification language is used. Exits 0 on network failure unless `--strict` is set.
 
+### windows_screenshot.py
+Windows desktop screenshot helper. Use it when the user asks to inspect the Windows client UI or notification popups. It uses Pillow `ImageGrab.grab(all_screens=True)` to capture all monitors into one PNG, similar to `Win+PrtSc`, and writes a JSON status file.
+
+Install Pillow on the Windows host if needed:
+
+```
+python -m pip install pillow
+```
+
+For older hosts where `python` is Python 2.7, install the last compatible Pillow:
+
+```
+C:\Python27\Scripts\pip.exe install Pillow==6.2.2
+```
+
+Run manually for debugging:
+
+```
+python scripts/windows_screenshot.py --output C:\Users\Administrator\Desktop\agentnotify-python-screen.png
+```
+
+Run without a visible console by using `pythonw.exe` from the active Windows desktop session:
+
+```
+C:\Python27\pythonw.exe scripts\windows_screenshot.py --quiet --output C:\Users\Administrator\Desktop\agentnotify-python-screen.png
+```
+
+When launching remotely, schedule it as an interactive task (`schtasks /Create ... /IT`) so it runs in the logged-in desktop session. Do not rely on SSH-only execution for screenshots; non-interactive sessions often fail with `screen grab failed` or capture the wrong desktop.
+
 ### configure_claude.py
 Queries manifest, selects events, writes Claude Code hooks to `~/.claude/settings.json` or project `.claude/settings.json`.
 
