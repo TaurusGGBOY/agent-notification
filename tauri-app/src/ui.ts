@@ -45,7 +45,6 @@ type TranslationKey =
   | "online"
   | "openSystemNotificationSettings"
   | "recentNotifications"
-  | "refresh"
   | "service"
   | "serviceSubtitle"
   | "start"
@@ -92,7 +91,6 @@ const translations: Record<"zh" | "en", Record<TranslationKey, string>> = {
     online: "在线",
     openSystemNotificationSettings: "打开系统通知设置",
     recentNotifications: "最近 3 次通知请求",
-    refresh: "刷新",
     service: "服务",
     serviceSubtitle: "本机 Agent 通知服务、广播和历史",
     start: "启动",
@@ -138,7 +136,6 @@ const translations: Record<"zh" | "en", Record<TranslationKey, string>> = {
     online: "Online",
     openSystemNotificationSettings: "Open system notification settings",
     recentNotifications: "Last 3 notification requests",
-    refresh: "Refresh",
     service: "Service",
     serviceSubtitle: "Local agent notification service, broadcast, and history",
     start: "Start",
@@ -263,7 +260,6 @@ export function render(): void {
           </div>
           <div class="button-row">
             <button class="primary" data-action="test">${t("test")}</button>
-            <button data-action="refresh">${t("refresh")}</button>
           </div>
         </section>
 
@@ -368,11 +364,6 @@ export function render(): void {
 function bindEvents(): void {
   document.querySelector<HTMLButtonElement>('[data-action="test"]')?.addEventListener("click", async () => {
     await sendTestNotification("start", currentLanguage());
-    await refreshState();
-    render();
-  });
-
-  document.querySelector<HTMLButtonElement>('[data-action="refresh"]')?.addEventListener("click", async () => {
     await refreshState();
     render();
   });
