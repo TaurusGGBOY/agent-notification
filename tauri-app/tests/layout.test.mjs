@@ -36,9 +36,22 @@ test("notification surface does not expose style or preview controls", async () 
 
 test("Windows sidecar build uses GUI subsystem", async () => {
   const prepareSidecar = await readProjectFile("scripts/prepare-sidecar.mjs");
+  const releaseWorkflow = await readProjectFile("../.github/workflows/release.yml");
 
   assert.match(prepareSidecar, /-ldflags/);
   assert.match(prepareSidecar, /-H=windowsgui/);
+  assert.match(releaseWorkflow, /go build -ldflags "-H=windowsgui" -o agent-notify-server\.exe/);
+  assert.match(releaseWorkflow, /go build -ldflags "-H=windowsgui" -o agent-notify-server-arm64\.exe/);
+});
+
+test("Windows startup removes legacy standalone server launchers before managing sidecar", async () => {
+  const service = await readProjectFile("src-tauri/src/service.rs");
+
+  assert.match(service, /cleanup_windows_legacy_server_autostart\(\)/);
+  assert.match(service, /stop_windows_standalone_server_processes\(\)/);
+  assert.match(service, /AgentNotifyServer/);
+  assert.match(service, /taskkill/);
+  assert.match(service, /CREATE_NO_WINDOW/);
 });
 
 test("dashboard exposes a copyable skill install command", async () => {
