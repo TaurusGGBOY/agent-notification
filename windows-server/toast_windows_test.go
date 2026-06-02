@@ -39,13 +39,13 @@ func withFakeToastDeps(t *testing.T) (*string, *string) {
 
 func TestWindowsToastNotifierNotifyUsesCleanStyle(t *testing.T) {
 	appID, xml := withFakeToastDeps(t)
-	notifier := NewToastNotifier("AgentNotify")
+	notifier := NewToastNotifier("com.agentnotify.client")
 
 	if err := notifier.Notify("Title", "Message"); err != nil {
 		t.Fatalf("Notify failed: %v", err)
 	}
-	if *appID != "AgentNotify" {
-		t.Fatalf("appID = %q, want AgentNotify", *appID)
+	if *appID != "com.agentnotify.client" {
+		t.Fatalf("appID = %q, want com.agentnotify.client", *appID)
 	}
 	if !strings.Contains(*xml, `>Title</text>`) {
 		t.Fatalf("clean toast XML missing title: %s", *xml)
@@ -54,13 +54,13 @@ func TestWindowsToastNotifierNotifyUsesCleanStyle(t *testing.T) {
 
 func TestWindowsToastNotifierNotifyWithStyleSendsFormattedXML(t *testing.T) {
 	appID, xml := withFakeToastDeps(t)
-	notifier := NewToastNotifier("AgentNotify")
+	notifier := NewToastNotifier("com.agentnotify.client")
 
 	if err := notifier.NotifyWithStyle("agent-badge", "start", "Agent Started", "message", "codex"); err != nil {
 		t.Fatalf("NotifyWithStyle failed: %v", err)
 	}
-	if *appID != "AgentNotify" {
-		t.Fatalf("appID = %q, want AgentNotify", *appID)
+	if *appID != "com.agentnotify.client" {
+		t.Fatalf("appID = %q, want com.agentnotify.client", *appID)
 	}
 	if !strings.Contains(*xml, `message`) {
 		t.Fatalf("toast XML missing message: %s", *xml)

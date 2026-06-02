@@ -1,7 +1,11 @@
 use serde::Serialize;
+#[cfg(windows)]
+use std::os::windows::process::CommandExt;
 
 const APP_BUNDLE_ID: &str = "com.agentnotify.client";
-const APP_NOTIFICATION_IDS: [&str; 2] = ["AgentNotify", "com.agentnotify.client"];
+const APP_NOTIFICATION_IDS: [&str; 2] = ["com.agentnotify.client", "AgentNotify"];
+#[cfg(windows)]
+const CREATE_NO_WINDOW: u32 = 0x0800_0000;
 const NOTIFICATION_SETTINGS_ROOT: &str =
     r"HKCU\Software\Microsoft\Windows\CurrentVersion\Notifications\Settings";
 const PUSH_NOTIFICATIONS_KEY: &str =
@@ -95,9 +99,7 @@ fn parse_registry_dword(value: &str) -> Option<bool> {
 
 #[cfg(windows)]
 fn query_windows_notification_enabled() -> Option<bool> {
-    use std::process::Command;
-
-    let global_output = Command::new("reg")
+    let global_output = hidden_windows_command("reg")
         .args(["query", PUSH_NOTIFICATIONS_KEY])
         .output()
         .ok()?;
@@ -110,7 +112,10 @@ fn query_windows_notification_enabled() -> Option<bool> {
 
     for app_id in APP_NOTIFICATION_IDS {
         let key = format!(r"{NOTIFICATION_SETTINGS_ROOT}\{app_id}");
-        let output = Command::new("reg").args(["query", &key]).output().ok()?;
+        let output = hidden_windows_command("reg")
+            .args(["query", &key])
+            .output()
+            .ok()?;
         if !output.status.success() {
             continue;
         }
@@ -120,6 +125,13 @@ fn query_windows_notification_enabled() -> Option<bool> {
         }
     }
     None
+}
+
+#[cfg(windows)]
+fn hidden_windows_command(program: &str) -> std::process::Command {
+    let mut cmd = std::process::Command::new(program);
+    cmd.creation_flags(CREATE_NO_WINDOW);
+    cmd
 }
 
 #[cfg(not(windows))]
@@ -132,7 +144,7 @@ fn query_windows_notification_enabled() -> Option<bool> {
 
 #[cfg(windows)]
 fn open_notification_settings() -> Result<(), String> {
-    std::process::Command::new("explorer.exe")
+    hidden_windows_command("explorer.exe")
         .arg("ms-settings:notifications")
         .spawn()
         .map_err(|err| format!("failed to open Windows notification settings: {err}"))?;

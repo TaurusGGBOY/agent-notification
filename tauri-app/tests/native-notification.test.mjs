@@ -83,3 +83,34 @@ test("macOS notification settings opens this app's notification detail page", as
   assert.match(notificationSettings, /com\.agentnotify\.client/);
   assert.match(notificationSettings, /com\.apple\.preference\.notifications\?id=/);
 });
+
+test("Windows notification registry probes run without visible console windows", async () => {
+  const notificationSettings = await readProjectFile("src-tauri/src/notification_settings.rs");
+
+  assert.match(notificationSettings, /std::os::windows::process::CommandExt/);
+  assert.match(notificationSettings, /const CREATE_NO_WINDOW:\s*u32\s*=\s*0x0800_0000/);
+  assert.match(notificationSettings, /fn hidden_windows_command\(program: &str\) -> std::process::Command/);
+  assert.match(notificationSettings, /cmd\.creation_flags\(CREATE_NO_WINDOW\)/);
+  assert.doesNotMatch(notificationSettings, /Command::new\("reg"\)/);
+});
+
+test("Windows toast AppID matches the installed Tauri application identity", async () => {
+  const config = JSON.parse(await readProjectFile("src-tauri/tauri.conf.json"));
+  const handlers = await readProjectFile("../windows-server/handlers.go");
+  const notificationSettings = await readProjectFile("src-tauri/src/notification_settings.rs");
+  const shortcutRegistration = await readProjectFile("../windows-server/scripts/register-agentnotify-shortcut.ps1");
+
+  assert.equal(config.identifier, "com.agentnotify.client");
+  assert.match(handlers, /NewToastNotifier\("com\.agentnotify\.client"\)/);
+  assert.match(notificationSettings, /APP_NOTIFICATION_IDS:\s*\[&str;\s*2\]\s*=\s*\["com\.agentnotify\.client",\s*"AgentNotify"\]/);
+  assert.match(shortcutRegistration, /\[string\]\$AppId = "com\.agentnotify\.client"/);
+});
+
+test("Windows notification settings action seeds the app in notification settings first", async () => {
+  const ui = await readProjectFile("src/ui.ts");
+
+  assert.match(
+    ui,
+    /else if \(isWindows\) \{[\s\S]*await sendTestNotification\("start"\);[\s\S]*await openWindowsNotificationSettings\(\);[\s\S]*\}/,
+  );
+});

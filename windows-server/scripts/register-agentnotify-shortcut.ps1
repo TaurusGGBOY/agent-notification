@@ -1,7 +1,7 @@
 param(
     [string]$ExePath = "D:\project\agent-notification\windows-server\agent-notify-server.exe",
     [string]$WorkDir = "D:\project\agent-notification\windows-server",
-    [string]$AppId = "AgentNotify"
+    [string]$AppId = "com.agentnotify.client"
 )
 
 $ErrorActionPreference = "Stop"

@@ -189,6 +189,7 @@ function bindEvents(): void {
       if (isMacos) {
         await openMacosNotificationSettings();
       } else if (isWindows) {
+        await sendTestNotification("start");
         await openWindowsNotificationSettings();
       }
       pollNativeNotificationStatus();
