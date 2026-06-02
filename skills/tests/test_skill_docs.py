@@ -14,6 +14,8 @@ class SkillDocsTests(unittest.TestCase):
         self.assertIn("--agents claude codex openclaw", text)
         self.assertIn("configure_openclaw.py", text)
         self.assertIn("Do not only explain", text)
+        self.assertIn("standard library", text)
+        self.assertNotIn("zeroconf", text.lower())
 
 
 if __name__ == "__main__":

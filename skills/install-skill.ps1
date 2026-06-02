@@ -13,9 +13,5 @@ foreach ($dest in $dests) {
   }
   Copy-Item -Recurse $src $dest
 
-  py -3 -m venv (Join-Path $dest ".venv")
-  & (Join-Path $dest ".venv\Scripts\python.exe") -m pip install --upgrade pip
-  & (Join-Path $dest ".venv\Scripts\python.exe") -m pip install zeroconf
-
   Write-Host "Installed agent-notify-discovery skill at $dest"
 }

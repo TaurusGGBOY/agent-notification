@@ -18,9 +18,5 @@ for DEST_DIR in "${DEST_DIRS[@]}"; do
   cp -R "${SRC_DIR}/scripts" "${DEST_DIR}/"
   cp -R "${SRC_DIR}/tests" "${DEST_DIR}/"
 
-  python3 -m venv "${DEST_DIR}/.venv"
-  "${DEST_DIR}/.venv/bin/python" -m pip install --upgrade pip
-  "${DEST_DIR}/.venv/bin/python" -m pip install zeroconf
-
   echo "Installed agent-notify-discovery skill at ${DEST_DIR}"
 done
