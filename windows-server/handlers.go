@@ -14,7 +14,7 @@ import (
 )
 
 const (
-	version                   = "1.0.2"
+	version                   = "1.0.4"
 	mdnsServiceType           = "_agent-notify._tcp"
 	tauriNotificationPrefix   = "AGENT_NOTIFY_TAURI_NOTIFICATION "
 	tauriNotificationEnvVar   = "AGENT_NOTIFY_TAURI_STDOUT"

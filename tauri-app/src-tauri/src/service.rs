@@ -84,69 +84,29 @@ fn is_managed_server_healthy(instance_token: &str) -> bool {
     }
 }
 
-fn manifest_lan_addr() -> Result<String, String> {
-    let client = Client::new(control_addr(), Duration::from_millis(600))?;
-    let body = client.get_text("/manifest")?;
-    let manifest: serde_json::Value = serde_json::from_str(&body).map_err(|err| err.to_string())?;
-    let url = manifest
-        .get("url")
-        .and_then(|value| value.as_str())
-        .ok_or_else(|| "manifest missing url".to_string())?;
-    http_url_host_port(url).ok_or_else(|| format!("manifest url is not LAN reachable: {url}"))
-}
-
-pub fn http_url_host_port(url: &str) -> Option<String> {
-    let rest = url.strip_prefix("http://")?;
-    let authority = rest.split('/').next().unwrap_or(rest);
-    let (host, port) = authority.rsplit_once(':')?;
-    let host = host.trim();
-    let port = port.trim();
-    let bare_host = host.trim_matches(['[', ']']);
-    let lower_host = bare_host.to_ascii_lowercase();
-
-    if host.is_empty()
-        || port.is_empty()
-        || authority.contains('@')
-        || port.parse::<u16>().ok()? == 0
-        || lower_host == "localhost"
-        || lower_host == "::1"
-        || lower_host == "0.0.0.0"
-        || lower_host.starts_with("127.")
-    {
-        return None;
-    }
-
-    Some(format!("{host}:{port}"))
-}
-
-pub fn is_server_lan_reachable() -> bool {
-    let addr = match manifest_lan_addr() {
-        Ok(addr) => addr,
-        Err(_) => return false,
-    };
-    let client = match Client::new(&addr, Duration::from_millis(600)) {
-        Ok(c) => c,
-        Err(_) => return false,
-    };
-    client.get("/health").is_ok()
-}
-
 fn wait_for_managed_server_ready(instance_token: &str, timeout: Duration) -> bool {
+    wait_for_managed_server_ready_with(timeout, || is_managed_server_healthy(instance_token))
+}
+
+fn wait_for_managed_server_ready_with<F>(timeout: Duration, mut is_managed_healthy: F) -> bool
+where
+    F: FnMut() -> bool,
+{
     let deadline = Instant::now() + timeout;
     while Instant::now() < deadline {
-        if is_managed_server_healthy(instance_token) && is_server_lan_reachable() {
+        if is_managed_healthy() {
             return true;
         }
         std::thread::sleep(Duration::from_millis(100));
     }
-    is_managed_server_healthy(instance_token) && is_server_lan_reachable()
+    is_managed_healthy()
 }
 
 pub fn ensure_sidecar(app: &AppHandle) -> Result<(), String> {
     let state = app.state::<ServiceState>();
     let instance_token = state.instance_token().to_string();
 
-    if is_managed_server_healthy(&instance_token) && is_server_lan_reachable() {
+    if is_managed_server_healthy(&instance_token) {
         return Ok(());
     }
 
@@ -157,7 +117,7 @@ pub fn ensure_sidecar(app: &AppHandle) -> Result<(), String> {
             return Ok(());
         }
         return Err(format!(
-            "server running but did not become LAN reachable on {}",
+            "server running but did not become healthy on {}",
             sidecar_listen_addr()
         ));
     }
@@ -214,7 +174,7 @@ pub fn ensure_sidecar(app: &AppHandle) -> Result<(), String> {
             let _ = child.kill();
         }
         Err(format!(
-            "server started but did not become LAN reachable on {}",
+            "server started but did not become healthy on {}",
             sidecar_listen_addr()
         ))
     }
@@ -357,8 +317,10 @@ fn show_forwarded_notification(app: AppHandle, notification: ForwardedNotificati
 
 #[cfg(test)]
 mod tests {
+    use std::time::Duration;
+
     use super::{
-        control_addr, health_instance_token_matches, http_url_host_port,
+        control_addr, health_instance_token_matches, wait_for_managed_server_ready_with,
         parse_forwarded_notification_line, sidecar_listen_addr, SidecarStdoutRouter,
     };
 
@@ -373,39 +335,6 @@ mod tests {
     }
 
     #[test]
-    fn parses_lan_manifest_url_host_port() {
-        assert_eq!(
-            http_url_host_port("http://192.168.1.10:17891/manifest"),
-            Some("192.168.1.10:17891".to_string())
-        );
-    }
-
-    #[test]
-    fn rejects_loopback_manifest_urls_for_lan_reuse() {
-        assert_eq!(http_url_host_port("http://127.0.0.1:17891/manifest"), None);
-        assert_eq!(http_url_host_port("http://localhost:17891/manifest"), None);
-    }
-
-    #[test]
-    fn rejects_non_lan_manifest_urls() {
-        assert_eq!(http_url_host_port("http://0.0.0.0:17891/manifest"), None);
-        assert_eq!(http_url_host_port("http://192.168.1.10:0/manifest"), None);
-        assert_eq!(
-            http_url_host_port("http://user@192.168.1.10:17891/manifest"),
-            None
-        );
-        assert_eq!(
-            http_url_host_port("https://192.168.1.10:17891/manifest"),
-            None
-        );
-        assert_eq!(http_url_host_port("http://[::1]:17891/manifest"), None);
-        assert_eq!(
-            http_url_host_port("http://192.168.1.10:notaport/manifest"),
-            None
-        );
-    }
-
-    #[test]
     fn health_instance_token_must_match_managed_sidecar() {
         let managed = r#"{"status":"ok","version":"1.0.1","instanceToken":"token-123"}"#;
         let external = r#"{"status":"ok","version":"1.0.1"}"#;
@@ -415,6 +344,11 @@ mod tests {
         assert!(!health_instance_token_matches(external, "token-123"));
         assert!(!health_instance_token_matches(other_instance, "token-123"));
         assert!(!health_instance_token_matches(managed, ""));
+    }
+
+    #[test]
+    fn managed_service_readiness_does_not_require_lan_self_connect() {
+        assert!(wait_for_managed_server_ready_with(Duration::ZERO, || true));
     }
 
     #[test]
