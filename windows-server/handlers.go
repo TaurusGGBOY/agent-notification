@@ -14,7 +14,7 @@ import (
 )
 
 const (
-	version                   = "1.0.5"
+	version                   = "1.0.6"
 	mdnsServiceType           = "_agent-notify._tcp"
 	tauriNotificationPrefix   = "AGENT_NOTIFY_TAURI_NOTIFICATION "
 	tauriNotificationEnvVar   = "AGENT_NOTIFY_TAURI_STDOUT"
@@ -125,7 +125,7 @@ type Server struct {
 func NewServer(cfg *Config) *Server {
 	return &Server{
 		config:                cfg,
-		notifier:              NewToastNotifier("AgentNotify"),
+		notifier:              NewToastNotifier("com.agentnotify.client"),
 		notificationForwarder: newNotificationForwarder(),
 	}
 }
