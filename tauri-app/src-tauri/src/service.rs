@@ -4,6 +4,9 @@ use std::process;
 use std::sync::Mutex;
 use std::time::{Duration, Instant, SystemTime, UNIX_EPOCH};
 
+#[cfg(windows)]
+use std::os::windows::process::CommandExt;
+
 use tauri::{AppHandle, Emitter, Manager, State};
 use tauri_plugin_shell::process::{CommandChild, CommandEvent};
 use tauri_plugin_shell::ShellExt;
@@ -14,6 +17,8 @@ const CONTROL_ADDR: &str = "127.0.0.1:17891";
 // This LAN-only tool intentionally exposes the entire unauthenticated Agent Notify HTTP API on the LAN.
 const SIDECAR_LISTEN_ADDR: &str = "0.0.0.0:17891";
 const NOTIFICATION_STDOUT_PREFIX: &str = "AGENT_NOTIFY_TAURI_NOTIFICATION ";
+#[cfg(windows)]
+const CREATE_NO_WINDOW: u32 = 0x0800_0000;
 
 pub fn control_addr() -> &'static str {
     CONTROL_ADDR
@@ -102,9 +107,41 @@ where
     is_managed_healthy()
 }
 
+#[cfg(windows)]
+fn wait_for_server_to_stop(timeout: Duration) -> bool {
+    let deadline = Instant::now() + timeout;
+    while Instant::now() < deadline {
+        if !is_server_healthy() {
+            return true;
+        }
+        std::thread::sleep(Duration::from_millis(100));
+    }
+    !is_server_healthy()
+}
+
+fn cleanup_windows_legacy_server_autostart() {
+    #[cfg(windows)]
+    run_hidden_windows_command("schtasks", &["/delete", "/tn", "AgentNotifyServer", "/f"]);
+}
+
+#[cfg(windows)]
+fn stop_windows_standalone_server_processes() {
+    run_hidden_windows_command("taskkill", &["/F", "/T", "/IM", "agent-notify-server.exe"]);
+}
+
+#[cfg(windows)]
+fn run_hidden_windows_command(program: &str, args: &[&str]) {
+    let _ = std::process::Command::new(program)
+        .args(args)
+        .creation_flags(CREATE_NO_WINDOW)
+        .status();
+}
+
 pub fn ensure_sidecar(app: &AppHandle) -> Result<(), String> {
     let state = app.state::<ServiceState>();
     let instance_token = state.instance_token().to_string();
+
+    cleanup_windows_legacy_server_autostart();
 
     if is_managed_server_healthy(&instance_token) {
         return Ok(());
@@ -120,6 +157,14 @@ pub fn ensure_sidecar(app: &AppHandle) -> Result<(), String> {
             "server running but did not become healthy on {}",
             sidecar_listen_addr()
         ));
+    }
+
+    #[cfg(windows)]
+    {
+        if is_server_healthy() {
+            stop_windows_standalone_server_processes();
+            let _ = wait_for_server_to_stop(Duration::from_secs(2));
+        }
     }
 
     if is_server_healthy() {

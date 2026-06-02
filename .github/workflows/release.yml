@@ -85,9 +85,9 @@ jobs:
         run: |
           $env:GOOS = "windows"
           $env:GOARCH = "amd64"
-          go build -o agent-notify-server.exe
+          go build -ldflags "-H=windowsgui" -o agent-notify-server.exe
           $env:GOARCH = "arm64"
-          go build -o agent-notify-server-arm64.exe
+          go build -ldflags "-H=windowsgui" -o agent-notify-server-arm64.exe
 
       - name: Collect release assets
         run: |
