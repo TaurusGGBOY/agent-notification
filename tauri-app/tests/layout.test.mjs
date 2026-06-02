@@ -91,6 +91,26 @@ test("dashboard exposes a one-click zh/en language toggle", async () => {
   assert.match(ui, /t\("notificationConsole"\)/);
 });
 
+test("sidebar exposes a platform startup toggle wired through Tauri commands", async () => {
+  const ui = await readProjectFile("src/ui.ts");
+  const api = await readProjectFile("src/api.ts");
+  const service = await readProjectFile("src/service.ts");
+  const state = await readProjectFile("src/state.ts");
+  const main = await readProjectFile("src-tauri/src/main.rs");
+
+  assert.match(api, /export interface StartupStatus/);
+  assert.match(api, /invoke<StartupStatus>\("startup_status"\)/);
+  assert.match(api, /invoke<StartupStatus>\("set_startup_enabled", \{ enabled \}\)/);
+  assert.match(service, /getStartupStatus/);
+  assert.match(state, /startup: StartupStatus \| null/);
+  assert.match(ui, /startupAtLogin/);
+  assert.match(ui, /data-action="startup"/);
+  assert.match(ui, /setStartupEnabled\(next\)/);
+  assert.match(main, /mod startup;/);
+  assert.match(main, /startup::startup_status/);
+  assert.match(main, /startup::set_startup_enabled/);
+});
+
 test("npx install entrypoint installs the bundled discovery skill", async () => {
   const installer = await readProjectFile("../scripts/install-skill.mjs");
 

@@ -5,6 +5,7 @@ import type {
   Manifest,
   NotificationHistoryItem,
   ServiceStatus,
+  StartupStatus,
   UpdateCheckResult,
   WindowsNotificationStatus,
 } from "./api";
@@ -15,12 +16,14 @@ export interface AppState {
   config: AgentConfig | null;
   manifest: Manifest | null;
   broadcast: BroadcastStatus | null;
+  startup: StartupStatus | null;
   windowsNotifications: WindowsNotificationStatus | null;
   macosNotifications: MacosNotificationStatus | null;
   serviceStatus: ServiceStatus | null;
   history: NotificationHistoryItem[];
   historyError: string;
   broadcastError: string;
+  startupError: string;
   windowsNotificationError: string;
   macosNotificationError: string;
   serviceHealthy: boolean;
@@ -35,12 +38,14 @@ export const state: AppState = {
   config: null,
   manifest: null,
   broadcast: null,
+  startup: null,
   windowsNotifications: null,
   macosNotifications: null,
   serviceStatus: null,
   history: [],
   historyError: "",
   broadcastError: "",
+  startupError: "",
   windowsNotificationError: "",
   macosNotificationError: "",
   serviceHealthy: false,

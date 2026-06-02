@@ -32,6 +32,11 @@ export interface BroadcastStatus {
   enabled: boolean;
 }
 
+export interface StartupStatus {
+  enabled: boolean;
+  supported: boolean;
+}
+
 export interface ServiceStatus {
   healthy: boolean;
   managed_by_tauri: boolean;
@@ -93,6 +98,14 @@ export async function setBroadcastEnabled(enabled: boolean): Promise<BroadcastSt
     throw new Error(`set broadcast failed: ${res.status}`);
   }
   return (await res.json()) as BroadcastStatus;
+}
+
+export async function getStartupStatus(): Promise<StartupStatus> {
+  return await invoke<StartupStatus>("startup_status");
+}
+
+export async function setStartupEnabled(enabled: boolean): Promise<StartupStatus> {
+  return await invoke<StartupStatus>("set_startup_enabled", { enabled });
 }
 
 export async function getNotificationHistory(): Promise<NotificationHistory> {

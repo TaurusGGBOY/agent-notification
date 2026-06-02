@@ -175,6 +175,7 @@ button {
 }
 
 .side-summary .broadcast-row,
+.side-summary .startup-row,
 .side-summary .notification-row {
   display: flex;
   align-items: center;
@@ -187,6 +188,7 @@ button {
 }
 
 .side-summary .broadcast-row span,
+.side-summary .startup-row span,
 .side-summary .notification-row span {
   color: var(--muted);
   font-size: 14px;
