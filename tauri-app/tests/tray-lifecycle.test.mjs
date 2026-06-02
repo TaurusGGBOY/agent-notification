@@ -37,7 +37,7 @@ test("close hides the main window and only tray quit exits", async () => {
   assert.match(main, /consume_tray_exit_request\(\)/);
   assert.match(main, /api\.prevent_exit\(\)/);
   assert.match(main, /\.enable_macos_default_menu\(false\)/);
-  assert.match(main, /ActivationPolicy::Accessory/);
+  assert.match(main, /ActivationPolicy::Regular/);
   assert.match(main, /if let Err\(err\) = service::ensure_sidecar\(app\.handle\(\)\)/);
   assert.doesNotMatch(main, /service::ensure_sidecar\(app\.handle\(\)\?;/);
 

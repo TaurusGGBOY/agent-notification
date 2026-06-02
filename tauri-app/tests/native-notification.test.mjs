@@ -49,6 +49,33 @@ test("macOS notification delegate is registered before startup notifications can
   );
 });
 
+test("macOS notification delegate setup tolerates dev runs without an app bundle", async () => {
+  const nativeNotification = await readProjectFile("src-tauri/native/macos_notification.m");
+
+  const guardIndex = nativeNotification.indexOf("if (!agentnotify_has_app_bundle())");
+  const centerIndex = nativeNotification.indexOf("[[UNUserNotificationCenter currentNotificationCenter] setDelegate");
+
+  assert.notEqual(guardIndex, -1);
+  assert.notEqual(centerIndex, -1);
+  assert.ok(guardIndex < centerIndex);
+  assert.match(nativeNotification, /pathExtension[\s\S]*isEqualToString:@"app"/);
+  assert.match(nativeNotification, /notification center delegate setup skipped: missing app bundle/);
+});
+
+test("macOS app windows are left capturable for screenshots and screen sharing", async () => {
+  const main = await readProjectFile("src-tauri/src/main.rs");
+  const nativeBindings = await readProjectFile("src-tauri/src/native_notification.rs");
+  const nativeNotification = await readProjectFile("src-tauri/native/macos_notification.m");
+
+  assert.match(main, /native_notification::make_windows_capturable\(\);/);
+  assert.match(main, /window\.set_content_protected\(false\)/);
+  assert.match(nativeBindings, /fn agentnotify_make_windows_capturable\(\);/);
+  assert.match(nativeBindings, /pub fn make_windows_capturable\(\)/);
+  assert.match(nativeNotification, /void agentnotify_make_windows_capturable\(void\)/);
+  assert.match(nativeNotification, /NSWindowSharingReadOnly/);
+  assert.doesNotMatch(nativeNotification, /agentnotify_make_windows_capturable[\s\S]*NSWindowSharingNone/);
+});
+
 test("macOS notification delivery does not force the app into the foreground", async () => {
   const nativeNotification = await readProjectFile("src-tauri/native/macos_notification.m");
 
