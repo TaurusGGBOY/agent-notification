@@ -1,5 +1,15 @@
 # Agent Notes
 
+## Development Workflow
+
+- Keep normal code and documentation work in a feature worktree, not the repository root worktree.
+- Run the relevant automated tests before committing.
+- Before committing, decide whether the change can be verified with a screenshot. UI changes, notification behavior, installer/client startup behavior, and other visible workflows should be screenshot-verified when a desktop session is available.
+- If screenshot verification is possible, capture and inspect the screenshot before committing. Do not commit until the screenshot confirms the visible behavior is correct.
+- Review the exact staged or to-be-committed diff before committing. Fix any issues found during this review first.
+- Push the feature branch and open or update the PR only after tests, screenshot verification when applicable, and pre-commit review pass.
+- After opening or updating the PR, review the PR diff and CI/check results again. Apply fixes in the same feature branch and repeat until there are no blocking issues.
+
 ## Local macOS DMG and Toast Verification
 
 - Use `/Users/gaoguobin/project/agent-notification/.worktrees/package-dmg-20260531` for local macOS DMG packaging experiments.
