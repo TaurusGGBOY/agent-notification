@@ -191,10 +191,18 @@ def discover_mdns_native(timeout=3.0):
 
 def choose_address(addresses):
     """Choose first non-loopback IPv4 address, then any non-loopback address."""
-    non_loopback = [address for address in addresses if not address.startswith(("127.", "::1"))]
-    for address in non_loopback:
+    routable = [
+        address
+        for address in addresses
+        if not address.startswith(("127.", "169.254.", "::1", "fe80:"))
+    ]
+    for address in routable:
         if "." in address:
             return address
+    if routable:
+        return routable[0]
+
+    non_loopback = [address for address in addresses if not address.startswith(("127.", "::1"))]
     return non_loopback[0] if non_loopback else (addresses[0] if addresses else "")
 
 

@@ -24,6 +24,11 @@ def dns_rr(name, rr_type, payload, ttl=120, rr_class=1):
 
 
 class DiscoverTests(unittest.TestCase):
+    def test_choose_address_prefers_lan_ipv4_over_link_local(self):
+        address = discover.choose_address(["169.254.102.171", "192.168.31.167"])
+
+        self.assertEqual(address, "192.168.31.167")
+
     def test_native_mdns_query_requests_unicast_response(self):
         packet = discover.mdns_query_packet()
 
