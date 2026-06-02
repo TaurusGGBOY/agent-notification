@@ -1,6 +1,9 @@
 import { invoke } from "@tauri-apps/api/core";
+import { relaunch } from "@tauri-apps/plugin-process";
+import { check, type Update } from "@tauri-apps/plugin-updater";
 
 const BASE_URL = "http://127.0.0.1:17891";
+let pendingUpdate: Update | null = null;
 
 export type NotificationStyle = "clean";
 export type EventName = "start" | "stop";
@@ -55,6 +58,18 @@ export interface NotificationHistoryItem {
 export interface NotificationHistory {
   items: NotificationHistoryItem[];
 }
+
+export type UpdateCheckResult =
+  | {
+      available: true;
+      version: string;
+      currentVersion: string;
+      date?: string;
+      body?: string;
+    }
+  | {
+      available: false;
+    };
 
 export async function getConfig(): Promise<AgentConfig> {
   return getJson<AgentConfig>("/config");
@@ -117,6 +132,33 @@ export async function getMacosNotificationStatus(): Promise<MacosNotificationSta
 
 export async function openMacosNotificationSettings(): Promise<void> {
   await invoke("open_macos_notification_settings");
+}
+
+export async function checkForUpdate(): Promise<UpdateCheckResult> {
+  pendingUpdate = await check();
+  if (!pendingUpdate) {
+    return { available: false };
+  }
+
+  return {
+    available: true,
+    version: pendingUpdate.version,
+    currentVersion: pendingUpdate.currentVersion,
+    date: pendingUpdate.date,
+    body: pendingUpdate.body,
+  };
+}
+
+export async function installAvailableUpdate(): Promise<void> {
+  if (!pendingUpdate) {
+    pendingUpdate = await check();
+  }
+  if (!pendingUpdate) {
+    throw new Error("no update available");
+  }
+
+  await pendingUpdate.downloadAndInstall();
+  await relaunch();
 }
 
 export async function sendTestNotification(event: EventName = "start", language: AppLanguage = "zh"): Promise<void> {

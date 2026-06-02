@@ -78,6 +78,9 @@ jobs:
 
       - name: Build Tauri Windows app
         working-directory: tauri-app
+        env:
+          TAURI_SIGNING_PRIVATE_KEY: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY }}
+          TAURI_SIGNING_PRIVATE_KEY_PASSWORD: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY_PASSWORD }}
         run: npm run tauri:build
 
       - name: Build standalone server debug binaries
@@ -93,7 +96,7 @@ jobs:
         run: |
           New-Item -ItemType Directory -Force dist-release | Out-Null
           $bundleAssets = Get-ChildItem tauri-app/src-tauri/target/release/bundle -Recurse -File |
-            Where-Object { $_.Extension -in ".exe", ".msi" }
+            Where-Object { $_.Extension -in ".exe", ".msi", ".sig" }
           if (-not $bundleAssets) {
             throw "No Tauri Windows bundle assets (.exe/.msi) were found"
           }
@@ -108,14 +111,6 @@ jobs:
           name: agentnotify-windows
           path: dist-release/*
           if-no-files-found: error
-
-      - name: Create GitHub Release
-        uses: softprops/action-gh-release@v2
-        with:
-          tag_name: ${{ steps.release.outputs.tag }}
-          name: AgentNotify ${{ steps.release.outputs.tag }}
-          generate_release_notes: true
-          files: dist-release/*
 
   macos:
     name: Build macOS release
@@ -246,6 +241,8 @@ jobs:
             export APPLE_SIGNING_IDENTITY="-"
           fi
 
+          export TAURI_SIGNING_PRIVATE_KEY="${{ secrets.TAURI_SIGNING_PRIVATE_KEY }}"
+          export TAURI_SIGNING_PRIVATE_KEY_PASSWORD="${{ secrets.TAURI_SIGNING_PRIVATE_KEY_PASSWORD }}"
           npm run tauri:build -- --bundles dmg
 
       - name: Verify signed and notarized DMG
@@ -337,6 +334,18 @@ jobs:
             dmg_name="${dmg_name%.dmg}-unsigned.dmg"
           fi
           cp "$dmg_path" "dist-release/$dmg_name"
+          tarball_path="$(find tauri-app/src-tauri/target/release/bundle/macos -type f -name "*.app.tar.gz" | head -n 1)"
+          if [ -z "$tarball_path" ]; then
+            echo "No Tauri macOS updater tarball (.app.tar.gz) was found"
+            exit 1
+          fi
+          cp "$tarball_path" dist-release/
+          cp "$tarball_path.sig" dist-release/
+          case "$RUNNER_ARCH" in
+            ARM64) echo "darwin-aarch64" > dist-release/TAURI_UPDATER_MACOS_PLATFORMS.txt ;;
+            X64) echo "darwin-x86_64" > dist-release/TAURI_UPDATER_MACOS_PLATFORMS.txt ;;
+            *) echo "Unsupported macOS runner architecture for updater manifest: $RUNNER_ARCH"; exit 1 ;;
+          esac
 
           if [ -z "$(ls -A dist-release/*.dmg 2>/dev/null)" ]; then
             echo "No Tauri macOS bundle assets (.dmg) were found"
@@ -376,6 +385,46 @@ jobs:
           name: agentnotify-macos
           path: dist-release/*
           if-no-files-found: error
+
+  publish:
+    name: Publish GitHub release
+    runs-on: ubuntu-latest
+    needs: [windows, macos]
+
+    steps:
+      - name: Validate release tag
+        id: release
+        env:
+          RAW_TAG: ${{ github.event.inputs.tag || github.ref_name }}
+        run: |
+          tag="$RAW_TAG"
+          if [[ ! "$tag" =~ ^v[0-9A-Za-z][0-9A-Za-z._-]*$ ]]; then
+            echo "Release tag must start with v: $tag"
+            exit 1
+          fi
+          echo "tag=$tag" >> "$GITHUB_OUTPUT"
+
+      - name: Checkout tag
+        uses: actions/checkout@v4
+        with:
+          ref: refs/tags/${{ steps.release.outputs.tag }}
+
+      - name: Download release artifacts
+        uses: actions/download-artifact@v4
+        with:
+          path: dist-release
+          merge-multiple: true
+
+      - name: Generate updater manifest
+        run: |
+          node tauri-app/scripts/generate-updater-manifest.mjs \
+            dist-release \
+            "${{ steps.release.outputs.tag }}" \
+            "${{ github.repository }}"
+          test -f dist-release/latest.json
+
+      - name: List release assets
+        run: ls -la dist-release
 
       - name: Create GitHub Release
         uses: softprops/action-gh-release@v2

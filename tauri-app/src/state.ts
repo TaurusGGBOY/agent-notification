@@ -5,6 +5,7 @@ import type {
   Manifest,
   NotificationHistoryItem,
   ServiceStatus,
+  UpdateCheckResult,
   WindowsNotificationStatus,
 } from "./api";
 
@@ -23,6 +24,9 @@ export interface AppState {
   windowsNotificationError: string;
   macosNotificationError: string;
   serviceHealthy: boolean;
+  updateStatus: "idle" | "checking" | "available" | "current" | "installing" | "error";
+  updateResult: UpdateCheckResult | null;
+  updateError: string;
 }
 
 export const state: AppState = {
@@ -40,4 +44,7 @@ export const state: AppState = {
   windowsNotificationError: "",
   macosNotificationError: "",
   serviceHealthy: false,
+  updateStatus: "idle",
+  updateResult: null,
+  updateError: "",
 };

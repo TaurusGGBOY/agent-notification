@@ -1,4 +1,6 @@
 import {
+  checkForUpdate,
+  installAvailableUpdate,
   openMacosNotificationSettings,
   openWindowsNotificationSettings,
   saveConfig,
@@ -19,6 +21,7 @@ type TranslationKey =
   | "broadcast"
   | "broadcastNotice"
   | "cannotConnect"
+  | "checkUpdate"
   | "copied"
   | "copy"
   | "copyFailed"
@@ -26,8 +29,10 @@ type TranslationKey =
   | "external"
   | "history"
   | "historyLoadFailed"
+  | "installAndRestart"
   | "installCommand"
   | "installCommandHint"
+  | "installingUpdate"
   | "language"
   | "nativeUnavailable"
   | "noHistory"
@@ -47,6 +52,11 @@ type TranslationKey =
   | "themeToggle"
   | "unknown"
   | "unknownProject"
+  | "updateAvailable"
+  | "updateCheckFailed"
+  | "updateChecking"
+  | "updateCurrent"
+  | "updateHint"
   | "unsupported"
   | "version";
 
@@ -57,6 +67,7 @@ const translations: Record<"zh" | "en", Record<TranslationKey, string>> = {
     broadcast: "广播",
     broadcastNotice: "17891 端口由外部 Agent Notify 服务占用，退出客户端不会关闭该服务。",
     cannotConnect: "无法连接本地通知服务",
+    checkUpdate: "检查更新",
     copied: "已复制",
     copy: "复制",
     copyFailed: "复制失败",
@@ -64,8 +75,10 @@ const translations: Record<"zh" | "en", Record<TranslationKey, string>> = {
     external: "外部",
     history: "历史",
     historyLoadFailed: "历史加载失败",
+    installAndRestart: "安装并重启",
     installCommand: "安装 skill 命令",
     installCommandHint: "在 Agent 环境中运行后安装通知发现 skill",
+    installingUpdate: "正在安装更新，完成后将重启。",
     language: "语言",
     nativeUnavailable: "当前环境不可用",
     noHistory: "暂无通知记录",
@@ -85,6 +98,11 @@ const translations: Record<"zh" | "en", Record<TranslationKey, string>> = {
     themeToggle: "切换明暗模式",
     unknown: "未知",
     unknownProject: "未知项目",
+    updateAvailable: "发现新版本",
+    updateCheckFailed: "更新检查失败",
+    updateChecking: "正在检查更新...",
+    updateCurrent: "当前已是最新版本。",
+    updateHint: "手动检查 GitHub Release 上的签名更新。",
     unsupported: "不支持",
     version: "版本",
   },
@@ -94,6 +112,7 @@ const translations: Record<"zh" | "en", Record<TranslationKey, string>> = {
     broadcast: "Broadcast",
     broadcastNotice: "Port 17891 is used by an external Agent Notify service. Closing the client will not stop it.",
     cannotConnect: "Cannot connect to the local notification service",
+    checkUpdate: "Check for updates",
     copied: "Copied",
     copy: "Copy",
     copyFailed: "Copy failed",
@@ -101,8 +120,10 @@ const translations: Record<"zh" | "en", Record<TranslationKey, string>> = {
     external: "External",
     history: "History",
     historyLoadFailed: "Failed to load history",
+    installAndRestart: "Install and restart",
     installCommand: "Install skill command",
     installCommandHint: "Run this in an agent environment to install the notification discovery skill",
+    installingUpdate: "Installing update. The app will restart when complete.",
     language: "Language",
     nativeUnavailable: "Unavailable in this environment",
     noHistory: "No notifications yet",
@@ -122,6 +143,11 @@ const translations: Record<"zh" | "en", Record<TranslationKey, string>> = {
     themeToggle: "Toggle theme",
     unknown: "Unknown",
     unknownProject: "Unknown project",
+    updateAvailable: "New version available",
+    updateCheckFailed: "Update check failed",
+    updateChecking: "Checking for updates...",
+    updateCurrent: "You are on the latest version.",
+    updateHint: "Manually check signed updates from GitHub Releases.",
     unsupported: "Unsupported",
     version: "Version",
   },
@@ -150,6 +176,8 @@ export function render(): void {
       ? t("online")
       : t("external")
     : t("offline");
+  const updateAvailable = state.updateStatus === "available" && state.updateResult?.available === true;
+  const updateLabel = updateStatusLabel();
 
   // 统一通知状态：优先使用当前平台的原生通知
   const macosNotificationsSupported = state.macosNotifications?.supported === true;
@@ -246,6 +274,24 @@ export function render(): void {
                   <div><dt>${t("address")}</dt><dd>${escapeHtml(serviceUrl)}</dd></div>
                   <div><dt>Skill</dt><dd>${escapeHtml(SKILL_INSTALL_COMMAND)}</dd></div>
                 </dl>
+                <div class="update-panel">
+                  <p>${escapeHtml(updateLabel)}</p>
+                  <div>
+                    <button
+                      class="mini-button"
+                      data-action="check-update"
+                      type="button"
+                      ${state.updateStatus === "checking" || state.updateStatus === "installing" ? "disabled" : ""}
+                    >
+                      ${t("checkUpdate")}
+                    </button>
+                    ${
+                      updateAvailable
+                        ? `<button class="mini-button primary" data-action="install-update" type="button">${t("installAndRestart")}</button>`
+                        : ""
+                    }
+                  </div>
+                </div>
               </section>
             </div>
             <button class="icon-button" data-action="theme" title="${t("themeToggle")}">${currentTheme === "light" ? "☾" : "☀"}</button>
@@ -369,12 +415,52 @@ function bindEvents(): void {
     }, 1400);
   });
 
+  document.querySelector<HTMLButtonElement>('[data-action="check-update"]')?.addEventListener("click", async () => {
+    state.updateStatus = "checking";
+    state.updateError = "";
+    render();
+    try {
+      state.updateResult = await checkForUpdate();
+      state.updateStatus = state.updateResult.available ? "available" : "current";
+    } catch (err) {
+      state.updateStatus = "error";
+      state.updateError = err instanceof Error ? err.message : String(err);
+    }
+    render();
+  });
+
+  document.querySelector<HTMLButtonElement>('[data-action="install-update"]')?.addEventListener("click", async () => {
+    state.updateStatus = "installing";
+    state.updateError = "";
+    render();
+    try {
+      await installAvailableUpdate();
+    } catch (err) {
+      state.updateStatus = "error";
+      state.updateError = err instanceof Error ? err.message : String(err);
+      render();
+    }
+  });
+
   document.querySelectorAll<HTMLElement>("[data-drag-region]").forEach((element) => {
     element.addEventListener("mousedown", (event) => {
       if (event.button !== 0) return;
       void getCurrentWindow().startDragging();
     });
   });
+}
+
+function updateStatusLabel(): string {
+  if (state.updateStatus === "checking") return t("updateChecking");
+  if (state.updateStatus === "installing") return t("installingUpdate");
+  if (state.updateStatus === "current") return t("updateCurrent");
+  if (state.updateStatus === "error") return `${t("updateCheckFailed")}: ${state.updateError || t("unknown")}`;
+  if (state.updateResult?.available) {
+    return currentLanguage() === "en"
+      ? `${t("updateAvailable")} v${state.updateResult.version}; current version is v${state.updateResult.currentVersion}.`
+      : `${t("updateAvailable")} v${state.updateResult.version}，当前版本 v${state.updateResult.currentVersion}。`;
+  }
+  return t("updateHint");
 }
 
 async function copySkillInstallCommand(): Promise<void> {

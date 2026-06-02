@@ -395,6 +395,49 @@ button {
   line-height: 1.35;
 }
 
+.update-panel {
+  display: grid;
+  gap: 10px;
+  margin-top: 12px;
+  padding-top: 12px;
+  border-top: 1px solid var(--border);
+}
+
+.update-panel p {
+  margin: 0;
+  color: var(--muted);
+  font-size: 12px;
+  line-height: 1.4;
+}
+
+.update-panel div {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.mini-button {
+  min-height: 32px;
+  padding: 0 10px;
+  border: 1px solid var(--border);
+  border-radius: 7px;
+  background: var(--card-soft);
+  color: var(--text);
+  font-size: 12px;
+  font-weight: 700;
+}
+
+.mini-button.primary {
+  border-color: var(--primary);
+  background: var(--primary);
+  color: #fff;
+}
+
+.mini-button:disabled {
+  cursor: default;
+  opacity: .6;
+}
+
 .about-control:is(:hover, :focus-within) .about-popover {
   opacity: 1;
   pointer-events: auto;
