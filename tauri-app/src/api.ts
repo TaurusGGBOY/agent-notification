@@ -4,10 +4,12 @@ const BASE_URL = "http://127.0.0.1:17891";
 
 export type NotificationStyle = "clean";
 export type EventName = "start" | "stop";
+export type AppLanguage = "zh" | "en";
 
 export interface AgentConfig {
   notificationStyle: NotificationStyle;
   enabledEvents: EventName[];
+  language: AppLanguage;
   futureOverrides: Record<string, string>;
   _path?: string;
 }
@@ -117,12 +119,13 @@ export async function openMacosNotificationSettings(): Promise<void> {
   await invoke("open_macos_notification_settings");
 }
 
-export async function sendTestNotification(event: EventName = "start"): Promise<void> {
+export async function sendTestNotification(event: EventName = "start", language: AppLanguage = "zh"): Promise<void> {
   const payload = {
     agent: "tauri",
     event,
     project: "AgentNotify",
-    message: "来自 AgentNotify 的测试通知",
+    message: language === "en" ? "Test notification from AgentNotify" : "来自 AgentNotify 的测试通知",
+    language,
     timestamp: new Date().toISOString(),
     sourcePayload: { agentNotifyTest: true },
   };

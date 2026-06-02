@@ -5,6 +5,7 @@ import (
 	"os"
 	"path/filepath"
 	"runtime"
+	"strings"
 )
 
 const (
@@ -31,6 +32,7 @@ func configDir() string {
 type Config struct {
 	NotificationStyle string            `json:"notificationStyle"`
 	EnabledEvents     []string          `json:"enabledEvents"`
+	Language          string            `json:"language"`
 	FutureOverrides   map[string]string `json:"futureOverrides"`
 }
 
@@ -57,8 +59,9 @@ func LoadConfig() (*Config, error) {
 func DefaultConfig() *Config {
 	return &Config{
 		NotificationStyle: "clean",
-		EnabledEvents:      []string{"start", "stop"},
-		FutureOverrides:    make(map[string]string),
+		EnabledEvents:     []string{"start", "stop"},
+		Language:          "zh",
+		FutureOverrides:   make(map[string]string),
 	}
 }
 
@@ -79,9 +82,18 @@ func IsSupportedEvent(event string) bool {
 	return event == "start" || event == "stop"
 }
 
+func IsSupportedLanguage(language string) bool {
+	language = strings.ToLower(strings.TrimSpace(language))
+	return language == "zh" || language == "en"
+}
+
 func (c *Config) Normalize() {
 	if !IsSupportedStyle(c.NotificationStyle) {
 		c.NotificationStyle = "clean"
+	}
+	c.Language = strings.ToLower(strings.TrimSpace(c.Language))
+	if !IsSupportedLanguage(c.Language) {
+		c.Language = "zh"
 	}
 	if c.EnabledEvents == nil {
 		c.EnabledEvents = []string{"start", "stop"}

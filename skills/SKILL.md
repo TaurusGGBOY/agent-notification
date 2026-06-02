@@ -51,9 +51,9 @@ python scripts/setup.py --url http://IP:17891 --agents claude codex openclaw --e
 
 ### send.py
 ```
-python scripts/send.py --url http://IP:17891 --agent claude|codex|openclaw --event start|stop
+python scripts/send.py --url http://IP:17891 --agent claude|codex|openclaw --event start|stop --language zh|en
 ```
-Reads JSON from stdin when run as a hook. CLI args remain defaults unless stdin explicitly includes the same field. Exits 0 on network failure unless `--strict` is set.
+Reads JSON from stdin when run as a hook. CLI args remain defaults unless stdin explicitly includes the same field. `language` accepts `zh` or `en`; when omitted, the server's configured notification language is used. Exits 0 on network failure unless `--strict` is set.
 
 ### configure_claude.py
 Queries manifest, selects events, writes Claude Code hooks to `~/.claude/settings.json` or project `.claude/settings.json`.

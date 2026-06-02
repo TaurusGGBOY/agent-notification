@@ -74,6 +74,7 @@ type NotifyPayload struct {
 	Cwd           string                 `json:"cwd"`
 	Workdir       string                 `json:"workdir"`
 	Message       string                 `json:"message"`
+	Language      string                 `json:"language"`
 	Timestamp     string                 `json:"timestamp"`
 	SourcePayload map[string]interface{} `json:"sourcePayload"`
 }
@@ -244,8 +245,9 @@ func (s *Server) NotifyHandler(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	title := formatTitle(payload.Agent, event)
-	message := formatMessage(payload)
+	language := notificationLanguage(cfg, payload.Language)
+	title := formatTitleForLanguage(payload.Agent, event, language)
+	message := formatMessageForLanguage(payload, language)
 
 	if s.notificationForwarder != nil {
 		if err := s.notificationForwarder.Forward(title, message); err != nil {
@@ -320,18 +322,46 @@ func (s *Server) currentConfig() *Config {
 	return cfg
 }
 
+func notificationLanguage(cfg *Config, payloadLanguage string) string {
+	language := strings.ToLower(strings.TrimSpace(payloadLanguage))
+	if IsSupportedLanguage(language) {
+		return language
+	}
+	if cfg != nil && IsSupportedLanguage(cfg.Language) {
+		return cfg.Language
+	}
+	return "zh"
+}
+
 func formatTitle(agent, event string) string {
+	return formatTitleForLanguage(agent, event, "zh")
+}
+
+func formatTitleForLanguage(agent, event, language string) string {
 	switch strings.ToLower(strings.TrimSpace(event)) {
 	case "start":
+		if language == "en" {
+			return "Agent Started"
+		}
 		return "开始通知"
 	case "stop":
+		if language == "en" {
+			return "Agent Complete"
+		}
 		return "完成通知"
 	default:
+		if language == "en" {
+			return "Agent Notification"
+		}
 		return "通知"
 	}
 }
 
 func formatMessage(payload NotifyPayload) string {
+	return formatMessageForLanguage(payload, "zh")
+}
+
+func formatMessageForLanguage(payload NotifyPayload, language string) string {
 	workdir := strings.TrimSpace(payload.Cwd)
 	if workdir == "" {
 		workdir = strings.TrimSpace(payload.Workdir)
@@ -353,12 +383,24 @@ func formatMessage(payload NotifyPayload) string {
 	switch event {
 	case "start":
 		if name != "" {
+			if language == "en" {
+				return name + " started"
+			}
 			return name + " 已启动"
+		}
+		if language == "en" {
+			return "Started"
 		}
 		return "已启动"
 	case "stop":
 		if name != "" {
+			if language == "en" {
+				return name + " stopped"
+			}
 			return name + " 已停止"
+		}
+		if language == "en" {
+			return "Stopped"
 		}
 		return "已停止"
 	default:

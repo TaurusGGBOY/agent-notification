@@ -16,7 +16,7 @@ def normalize_payload(source_json):
         data = {}
 
     payload = {"sourcePayload": data}
-    for field in ("agent", "event", "project", "message", "timestamp"):
+    for field in ("agent", "event", "project", "message", "language", "timestamp"):
         value = data.get(field)
         if value:
             payload[field] = value
@@ -32,6 +32,11 @@ def default_project_from_cwd(cwd):
     return os.path.basename(os.path.normpath(cwd))
 
 
+def normalize_language(language):
+    language = (language or "").strip().lower()
+    return language if language in ("zh", "en") else ""
+
+
 def send_notification(
     url,
     agent,
@@ -39,6 +44,7 @@ def send_notification(
     project="",
     cwd="",
     message="",
+    language="",
     timestamp="",
     strict=False,
     source_payload=None,
@@ -49,6 +55,7 @@ def send_notification(
         "project": project,
         "cwd": cwd,
         "message": message,
+        "language": normalize_language(language),
         "timestamp": timestamp,
         "sourcePayload": source_payload or {},
     }
@@ -86,6 +93,7 @@ def main():
     parser.add_argument("--project", default="", help="Project name")
     parser.add_argument("--cwd", default="", help="Working directory")
     parser.add_argument("--message", default="", help="Notification message")
+    parser.add_argument("--language", choices=["zh", "en"], default="", help="Notification language")
     parser.add_argument("--timestamp", default="", help="ISO timestamp")
     parser.add_argument("--strict", action="store_true", help="Exit non-zero on failure")
     args = parser.parse_args()
@@ -101,6 +109,7 @@ def main():
         args.project = payload.get("project") or args.project
         args.cwd = payload.get("cwd") or args.cwd
         args.message = payload.get("message") or args.message
+        args.language = payload.get("language") or args.language
         args.timestamp = payload.get("timestamp") or args.timestamp
     else:
         payload = {"sourcePayload": {}}
@@ -115,6 +124,7 @@ def main():
         project=args.project,
         cwd=args.cwd,
         message=args.message,
+        language=args.language,
         timestamp=args.timestamp,
         strict=args.strict,
         source_payload=payload.get("sourcePayload", {}),
