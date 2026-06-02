@@ -534,8 +534,8 @@ func TestHealthHandler(t *testing.T) {
 	if resp.Status != "ok" {
 		t.Errorf("expected status 'ok', got %q", resp.Status)
 	}
-	if resp.Version != "1.0.2" {
-		t.Errorf("expected version '1.0.2', got %q", resp.Version)
+	if resp.Version != "1.0.4" {
+		t.Errorf("expected version '1.0.4', got %q", resp.Version)
 	}
 }
 
@@ -583,8 +583,8 @@ func TestManifestHandler(t *testing.T) {
 	if resp.Protocol != "mdns-dns-sd" {
 		t.Errorf("expected protocol 'mdns-dns-sd', got %q", resp.Protocol)
 	}
-	if resp.Version != "1.0.2" {
-		t.Errorf("expected version '1.0.2', got %q", resp.Version)
+	if resp.Version != "1.0.4" {
+		t.Errorf("expected version '1.0.4', got %q", resp.Version)
 	}
 }
 
