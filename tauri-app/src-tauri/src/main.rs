@@ -27,6 +27,8 @@ fn set_app_theme(app: tauri::AppHandle, theme: String) -> Result<(), String> {
 
 fn main() {
     tauri::Builder::default()
+        .plugin(tauri_plugin_process::init())
+        .plugin(tauri_plugin_updater::Builder::new().build())
         .plugin(tauri_plugin_shell::init())
         .enable_macos_default_menu(false)
         .manage(service::ServiceState::new())
