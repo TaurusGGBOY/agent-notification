@@ -10,6 +10,10 @@ import {
 } from "./api";
 import { state } from "./state";
 
+const AUTO_REFRESH_INTERVAL_MS = 3000;
+let autoRefreshTimer: number | null = null;
+let autoRefreshInFlight = false;
+
 export async function refreshState(): Promise<void> {
   state.loading = true;
   state.error = "";
@@ -69,4 +73,20 @@ export async function refreshState(): Promise<void> {
     state.macosNotifications = null;
     state.macosNotificationError = err instanceof Error ? err.message : String(err);
   }
+}
+
+export function startAutoRefresh(render: () => void): void {
+  if (autoRefreshTimer !== null) {
+    return;
+  }
+
+  autoRefreshTimer = window.setInterval(() => {
+    if (autoRefreshInFlight) {
+      return;
+    }
+    autoRefreshInFlight = true;
+    void refreshState().then(render).finally(() => {
+      autoRefreshInFlight = false;
+    });
+  }, AUTO_REFRESH_INTERVAL_MS);
 }
