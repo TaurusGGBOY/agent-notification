@@ -12,6 +12,8 @@ mod imp {
         ) -> c_int;
 
         fn agentnotify_configure_notification_center_early();
+
+        fn agentnotify_make_windows_capturable();
     }
 
     /// Register the UNUserNotificationCenter delegate as early as possible
@@ -19,6 +21,12 @@ mod imp {
     pub fn configure_delegate_early() {
         unsafe {
             agentnotify_configure_notification_center_early();
+        }
+    }
+
+    pub fn make_windows_capturable() {
+        unsafe {
+            agentnotify_make_windows_capturable();
         }
     }
 
@@ -62,3 +70,6 @@ pub use imp::show;
 
 #[cfg(target_os = "macos")]
 pub use imp::configure_delegate_early;
+
+#[cfg(target_os = "macos")]
+pub use imp::make_windows_capturable;

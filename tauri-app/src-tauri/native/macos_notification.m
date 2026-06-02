@@ -64,9 +64,19 @@ static NSString *agentnotify_string(const char *value) {
 
 static AgentNotifyAppNotificationDelegate *agentnotifyNotificationDelegate = nil;
 
+static BOOL agentnotify_has_app_bundle(void) {
+	NSString *bundlePath = [[NSBundle mainBundle] bundlePath];
+	return bundlePath != nil && [[bundlePath pathExtension] isEqualToString:@"app"];
+}
+
 void agentnotify_configure_notification_center_early(void) {
 	static dispatch_once_t once;
 	dispatch_once(&once, ^{
+		if (!agentnotify_has_app_bundle()) {
+			agentnotify_debug_log("notification center delegate setup skipped: missing app bundle");
+			return;
+		}
+
 		agentnotifyNotificationDelegate = [[AgentNotifyAppNotificationDelegate alloc] init];
 		[[UNUserNotificationCenter currentNotificationCenter] setDelegate:agentnotifyNotificationDelegate];
 		agentnotify_debug_log("notification center delegate configured (early)");
@@ -75,6 +85,15 @@ void agentnotify_configure_notification_center_early(void) {
 
 static void agentnotify_configure_notification_center(void) {
 	agentnotify_configure_notification_center_early();
+}
+
+void agentnotify_make_windows_capturable(void) {
+	@autoreleasepool {
+		for (NSWindow *window in [NSApp windows]) {
+			[window setSharingType:NSWindowSharingReadOnly];
+		}
+		agentnotify_debug_log("window sharing type set to NSWindowSharingReadOnly");
+	}
 }
 
 static void agentnotify_log_notification_settings(UNUserNotificationCenter *center) {

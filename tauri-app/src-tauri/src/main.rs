@@ -47,7 +47,7 @@ fn main() {
         ])
         .setup(|app| {
             #[cfg(target_os = "macos")]
-            app.set_activation_policy(tauri::ActivationPolicy::Accessory);
+            app.set_activation_policy(tauri::ActivationPolicy::Regular);
             // Register the notification delegate as early as possible so that
             // willPresentNotification: is active before any notification is posted.
             #[cfg(target_os = "macos")]
@@ -57,12 +57,15 @@ fn main() {
             }
             tray::build_tray(app.handle())?;
             if let Some(window) = app.get_webview_window("main") {
+                let _ = window.set_content_protected(false);
                 let _ = window.set_size(tauri::Size::Logical(tauri::LogicalSize {
                     width: 1200.0,
                     height: 675.0,
                 }));
                 let _ = window.center();
             }
+            #[cfg(target_os = "macos")]
+            native_notification::make_windows_capturable();
             Ok(())
         })
         .on_window_event(|window, event| {
