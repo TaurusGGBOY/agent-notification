@@ -26,7 +26,6 @@ def load_discover():
 def discover_server_url(timeout=DISCOVERY_TIMEOUT):
     try:
         discover_module = load_discover()
-        discover_module.reexec_with_venv_if_available()
         servers = discover_module.discover_mdns(timeout=timeout)
     except Exception as err:
         print(f"Warning: discovery failed: {err}", file=sys.stderr)

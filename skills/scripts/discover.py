@@ -6,50 +6,14 @@ import sys
 import json
 import time
 import argparse
-import os
-import re
-import subprocess
-import threading
 import urllib.error
 import urllib.request
-from pathlib import Path
 
 HTTP_PORT = 17891
 HTTP_TIMEOUT = 3
 SERVICE_TYPE = "_agent-notify._tcp.local."
-SCRIPT_DIR = Path(__file__).resolve().parent
-
-
-def sibling_venv_python():
-    """Return installer-created venv Python if present."""
-    skill_dir = SCRIPT_DIR.parent
-    candidates = [
-        skill_dir / ".venv" / "bin" / "python",
-        skill_dir / ".venv" / "Scripts" / "python.exe",
-    ]
-    for candidate in candidates:
-        if candidate.exists():
-            return candidate
-    return None
-
-
-def should_reexec_with_venv(current_executable=None):
-    if os.environ.get("AGENT_NOTIFY_NO_VENV_REEXEC"):
-        return False
-    if current_executable is None:
-        current_executable = sys.executable
-    venv_python = sibling_venv_python()
-    if not venv_python:
-        return False
-    return Path(current_executable).absolute() != venv_python.absolute()
-
-
-def reexec_with_venv_if_available():
-    """Use installed venv so default skill commands can import zeroconf."""
-    if not should_reexec_with_venv():
-        return
-    venv_python = sibling_venv_python()
-    os.execv(str(venv_python), [str(venv_python), *sys.argv])
+MDNS_GROUP = "224.0.0.251"
+MDNS_PORT = 5353
 
 
 def fetch_manifest(url, timeout=HTTP_TIMEOUT):
@@ -62,150 +26,167 @@ def fetch_manifest(url, timeout=HTTP_TIMEOUT):
     return payload
 
 
-def collect_pty_output(cmd, timeout):
-    """Collect output from tools like dns-sd that buffer under plain pipes."""
-    try:
-        import pty
-        import select
-    except ImportError:
-        return ""
+def encode_dns_name(name):
+    payload = bytearray()
+    for label in name.rstrip(".").split("."):
+        raw = label.encode("utf-8")
+        if len(raw) > 63:
+            raise ValueError(f"DNS label too long: {label}")
+        payload.append(len(raw))
+        payload.extend(raw)
+    payload.append(0)
+    return bytes(payload)
+
+
+def read_dns_name(packet, offset):
+    labels = []
+    jumped = False
+    end_offset = offset
+    seen_offsets = set()
+
+    while True:
+        if offset >= len(packet):
+            raise ValueError("DNS name extends past packet")
+        length = packet[offset]
+        if length & 0xC0 == 0xC0:
+            if offset + 1 >= len(packet):
+                raise ValueError("DNS pointer extends past packet")
+            pointer = ((length & 0x3F) << 8) | packet[offset + 1]
+            if pointer in seen_offsets:
+                raise ValueError("DNS pointer loop")
+            seen_offsets.add(pointer)
+            if not jumped:
+                end_offset = offset + 2
+                jumped = True
+            offset = pointer
+            continue
+        if length & 0xC0:
+            raise ValueError("Unsupported DNS label type")
+        offset += 1
+        if length == 0:
+            if not jumped:
+                end_offset = offset
+            break
+        if offset + length > len(packet):
+            raise ValueError("DNS label extends past packet")
+        labels.append(packet[offset : offset + length].decode("utf-8", errors="replace"))
+        offset += length
+
+    return ".".join(labels) + ".", end_offset
+
+
+def parse_mdns_records(packet):
+    if len(packet) < 12:
+        return []
+    qdcount = int.from_bytes(packet[4:6], "big")
+    ancount = int.from_bytes(packet[6:8], "big")
+    nscount = int.from_bytes(packet[8:10], "big")
+    arcount = int.from_bytes(packet[10:12], "big")
+    offset = 12
 
     try:
-        master, slave = pty.openpty()
-    except OSError:
-        return ""
+        for _ in range(qdcount):
+            _name, offset = read_dns_name(packet, offset)
+            offset += 4
 
-    chunks = []
-    proc = None
+        records = []
+        for _ in range(ancount + nscount + arcount):
+            name, offset = read_dns_name(packet, offset)
+            if offset + 10 > len(packet):
+                raise ValueError("DNS record header extends past packet")
+            rr_type = int.from_bytes(packet[offset : offset + 2], "big")
+            rr_class = int.from_bytes(packet[offset + 2 : offset + 4], "big") & 0x7FFF
+            ttl = int.from_bytes(packet[offset + 4 : offset + 8], "big")
+            rdlength = int.from_bytes(packet[offset + 8 : offset + 10], "big")
+            offset += 10
+            rdata_offset = offset
+            offset += rdlength
+            if offset > len(packet):
+                raise ValueError("DNS record data extends past packet")
+            records.append((name, rr_type, rr_class, ttl, rdata_offset, rdlength))
+    except ValueError:
+        return []
+
+    return records
+
+
+def urls_from_mdns_packet(packet):
+    ptr_instances = set()
+    srv_targets = {}
+    addresses = {}
+
+    for name, rr_type, _rr_class, _ttl, rdata_offset, rdlength in parse_mdns_records(packet):
+        try:
+            if rr_type == 12:
+                ptr_name, _ = read_dns_name(packet, rdata_offset)
+                if name.lower() == SERVICE_TYPE:
+                    ptr_instances.add(ptr_name)
+            elif rr_type == 33 and rdlength >= 7:
+                port = int.from_bytes(packet[rdata_offset + 4 : rdata_offset + 6], "big")
+                target, _ = read_dns_name(packet, rdata_offset + 6)
+                srv_targets[name] = (target, port)
+            elif rr_type == 1 and rdlength == 4:
+                addresses.setdefault(name, []).append(socket.inet_ntoa(packet[rdata_offset : rdata_offset + 4]))
+            elif rr_type == 28 and rdlength == 16:
+                addresses.setdefault(name, []).append(socket.inet_ntop(socket.AF_INET6, packet[rdata_offset : rdata_offset + 16]))
+        except (OSError, ValueError):
+            continue
+
+    urls = []
+    for instance in ptr_instances:
+        target = srv_targets.get(instance)
+        if not target:
+            continue
+        hostname, port = target
+        host = choose_address(addresses.get(hostname, []))
+        if not host:
+            continue
+        if ":" in host and not host.startswith("["):
+            host = f"[{host}]"
+        url = f"http://{host}:{port or HTTP_PORT}"
+        if url not in urls:
+            urls.append(url)
+    return urls
+
+
+def mdns_query_packet(service_type=SERVICE_TYPE):
+    header = b"\x00\x00\x00\x00\x00\x01\x00\x00\x00\x00\x00\x00"
+    question = encode_dns_name(service_type) + b"\x00\x0c\x80\x01"
+    return header + question
+
+
+def discover_mdns_native(timeout=3.0):
+    """Dependency-free mDNS/DNS-SD browse for Agent Notify services."""
+    servers = []
+    seen_urls = set()
+    sock = None
     try:
-        proc = subprocess.Popen(cmd, stdout=slave, stderr=slave, close_fds=True)
-        os.close(slave)
-        slave = None
+        sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM, socket.IPPROTO_UDP)
+        sock.setsockopt(socket.IPPROTO_IP, socket.IP_MULTICAST_TTL, 1)
+        sock.settimeout(0.25)
+        sock.sendto(mdns_query_packet(), (MDNS_GROUP, MDNS_PORT))
         end_time = time.time() + timeout
         while time.time() < end_time:
-            ready, _, _ = select.select([master], [], [], 0.1)
-            if not ready:
-                if proc.poll() is not None:
-                    break
+            try:
+                packet, _addr = sock.recvfrom(9000)
+            except socket.timeout:
                 continue
-            try:
-                chunk = os.read(master, 4096)
             except OSError:
                 break
-            if not chunk:
-                break
-            chunks.append(chunk)
-        if proc.poll() is None:
-            proc.terminate()
-            try:
-                proc.wait(timeout=1)
-            except subprocess.TimeoutExpired:
-                proc.kill()
-                proc.wait(timeout=1)
-    except (OSError, subprocess.SubprocessError):
-        return ""
+            for url in urls_from_mdns_packet(packet):
+                if url in seen_urls:
+                    continue
+                seen_urls.add(url)
+                try:
+                    servers.append(fetch_manifest(url))
+                except (OSError, urllib.error.URLError, json.JSONDecodeError) as err:
+                    print(f"native mDNS candidate did not answer at {url}: {err}", file=sys.stderr)
+    except OSError as err:
+        print(f"native mDNS discovery unavailable: {err}", file=sys.stderr)
     finally:
-        if slave is not None:
-            try:
-                os.close(slave)
-            except OSError:
-                pass
-        try:
-            os.close(master)
-        except OSError:
-            pass
-
-    return b"".join(chunks).decode("utf-8", errors="replace")
-
-
-def parse_dns_sd_browse(output):
-    instances = []
-    for line in output.splitlines():
-        parts = line.split()
-        if "Add" not in parts or "_agent-notify._tcp." not in parts:
-            continue
-        service_index = parts.index("_agent-notify._tcp.")
-        instance = " ".join(parts[service_index + 1 :]).strip()
-        if instance and instance not in instances:
-            instances.append(instance)
-    return instances
-
-
-def parse_dns_sd_resolve(output):
-    match = re.search(r"can be reached at\s+(.+?):(\d+)\s", output)
-    if not match:
-        return None
-    return match.group(1), int(match.group(2))
-
-
-def parse_dns_sd_ipv4(output):
-    addresses = []
-    for match in re.finditer(r"\b(?:\d{1,3}\.){3}\d{1,3}\b", output):
-        address = match.group(0)
-        if address.startswith(("127.", "169.254.")):
-            continue
-        if address not in addresses:
-            addresses.append(address)
-    return addresses
-
-
-def discover_mdns_dns_sd(timeout=3.0):
-    """Fallback to macOS dns-sd when python zeroconf cannot see an interface."""
-    browse_output = collect_pty_output(["dns-sd", "-B", "_agent-notify._tcp", "local."], timeout)
-    servers = []
-    for instance in parse_dns_sd_browse(browse_output):
-        resolve_output = collect_pty_output(["dns-sd", "-L", instance, "_agent-notify._tcp", "local."], 2)
-        resolved = parse_dns_sd_resolve(resolve_output)
-        if not resolved:
-            continue
-        hostname, port = resolved
-        address_output = collect_pty_output(["dns-sd", "-G", "v4", hostname], 2)
-        for address in parse_dns_sd_ipv4(address_output):
-            try:
-                servers.append(fetch_manifest(f"http://{address}:{port}"))
-                break
-            except (OSError, urllib.error.URLError, json.JSONDecodeError) as err:
-                print(f"dns-sd candidate did not answer at {address}:{port}: {err}", file=sys.stderr)
+        if sock is not None:
+            sock.close()
     return servers
-
-
-def load_zeroconf():
-    """Import zeroconf lazily so manual URL mode works without it."""
-    try:
-        from zeroconf import ServiceBrowser, ServiceListener, Zeroconf
-        from zeroconf import InterfaceChoice
-    except ImportError as err:
-        raise RuntimeError("zeroconf is required for mDNS discovery; run install-skill.sh") from err
-
-    def zeroconf_factory():
-        return Zeroconf(interfaces=InterfaceChoice.All)
-
-    return ServiceBrowser, ServiceListener, zeroconf_factory
-
-
-def service_addresses(info):
-    """Return parsed service addresses, preferring APIs across zeroconf versions."""
-    if hasattr(info, "parsed_addresses"):
-        try:
-            parsed = list(info.parsed_addresses())
-            if parsed:
-                return parsed
-        except TypeError:
-            pass
-
-    addresses = []
-    for raw in getattr(info, "addresses", []):
-        if isinstance(raw, str):
-            addresses.append(raw)
-            continue
-        try:
-            if len(raw) == 4:
-                addresses.append(socket.inet_ntoa(raw))
-            elif len(raw) == 16:
-                addresses.append(socket.inet_ntop(socket.AF_INET6, raw))
-        except OSError:
-            continue
-    return addresses
 
 
 def choose_address(addresses):
@@ -217,71 +198,9 @@ def choose_address(addresses):
     return non_loopback[0] if non_loopback else (addresses[0] if addresses else "")
 
 
-def url_from_service_info(info):
-    """Build HTTP URL from zeroconf service info."""
-    host = choose_address(service_addresses(info))
-    if not host:
-        return None
-    if ":" in host and not host.startswith("["):
-        host = f"[{host}]"
-    return f"http://{host}:{getattr(info, 'port', 0) or HTTP_PORT}"
-
-
-class AgentNotifyListener:
-    def __init__(self):
-        self.urls = {}
-        self._lock = threading.Lock()
-
-    def add_service(self, zeroconf, service_type, name):
-        self._record(zeroconf, service_type, name)
-
-    def update_service(self, zeroconf, service_type, name):
-        self._record(zeroconf, service_type, name)
-
-    def remove_service(self, zeroconf, service_type, name):
-        with self._lock:
-            self.urls.pop(name, None)
-
-    def _record(self, zeroconf, service_type, name):
-        info = zeroconf.get_service_info(service_type, name, timeout=1500)
-        if not info:
-            return
-        url = url_from_service_info(info)
-        if url:
-            with self._lock:
-                self.urls[name] = url
-
-    def snapshot_urls(self):
-        with self._lock:
-            return list(dict.fromkeys(self.urls.values()))
-
-
 def discover_mdns(timeout=3.0):
     """Discover servers through mDNS/DNS-SD."""
-    servers = []
-    try:
-        ServiceBrowser, _ServiceListener, Zeroconf = load_zeroconf()
-        zeroconf = Zeroconf()
-    except Exception as err:
-        print(f"mDNS discovery unavailable: {err}", file=sys.stderr)
-        return servers
-
-    listener = AgentNotifyListener()
-    try:
-        ServiceBrowser(zeroconf, SERVICE_TYPE, listener)
-        time.sleep(timeout)
-        urls = listener.snapshot_urls()
-    finally:
-        zeroconf.close()
-
-    for url in urls:
-        try:
-            servers.append(fetch_manifest(url))
-        except (OSError, urllib.error.URLError, json.JSONDecodeError) as err:
-            print(f"mDNS candidate did not answer at {url}: {err}", file=sys.stderr)
-    if not servers:
-        servers = discover_mdns_dns_sd(timeout=timeout)
-    return servers
+    return discover_mdns_native(timeout=timeout)
 
 
 def normalize_manual_url(value):
@@ -348,8 +267,6 @@ def discover(args):
 
 
 def main(argv=None):
-    reexec_with_venv_if_available()
-
     parser = argparse.ArgumentParser(description="Discover Agent Notify Servers")
     parser.add_argument("--json", action="store_true", help="Output JSON")
     parser.add_argument("--host", metavar="IP", help="Check single host directly")

@@ -27,12 +27,12 @@ sleep 2
 
 echo ""
 echo "Running discovery..."
-RESULT=$(~/.claude/skills/agent-notify-discovery/.venv/bin/python ~/.claude/skills/agent-notify-discovery/scripts/discover.py --timeout 5 --json 2>&1)
+RESULT=$(python3 ~/.claude/skills/agent-notify-discovery/scripts/discover.py --timeout 5 --json 2>&1)
 echo "$RESULT"
 
 echo ""
 echo "Checking results..."
-COUNT=$(echo "$RESULT" | ~/.claude/skills/agent-notify-discovery/.venv/bin/python -c "import sys,json; print(len(json.load(sys.stdin)))" 2>/dev/null || echo "0")
+COUNT=$(echo "$RESULT" | python3 -c "import sys,json; print(len(json.load(sys.stdin)))" 2>/dev/null || echo "0")
 
 kill $SERVER_PID 2>/dev/null || true
 

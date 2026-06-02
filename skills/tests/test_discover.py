@@ -1,7 +1,6 @@
 import importlib.util
+import struct
 import socket
-import sys
-import tempfile
 import unittest
 from pathlib import Path
 
@@ -13,145 +12,84 @@ discover = importlib.util.module_from_spec(SPEC)
 SPEC.loader.exec_module(discover)
 
 
-class FakeServiceInfo:
-    def __init__(self, addresses, port=17891, server="agent-notify.local."):
-        self.addresses = addresses
-        self.port = port
-        self.server = server
-        self.properties = {
-            b"path": b"/notify",
-            b"events": b"start,stop",
-        }
+def dns_name(name):
+    encoded = b""
+    for label in name.rstrip(".").split("."):
+        encoded += bytes([len(label)]) + label.encode("utf-8")
+    return encoded + b"\x00"
 
 
-class FakeZeroconf:
-    def __init__(self, info):
-        self.info = info
-        self.closed = False
-
-    def get_service_info(self, service_type, name, timeout=1500):
-        return self.info
-
-    def close(self):
-        self.closed = True
+def dns_rr(name, rr_type, payload, ttl=120, rr_class=1):
+    return dns_name(name) + struct.pack("!HHIH", rr_type, rr_class, ttl, len(payload)) + payload
 
 
 class DiscoverTests(unittest.TestCase):
-    def test_sibling_venv_python_is_used_for_reexec(self):
-        with tempfile.TemporaryDirectory() as root:
-            root_path = Path(root)
-            scripts_dir = root_path / "scripts"
-            venv_bin = root_path / ".venv" / "bin"
-            venv_python = venv_bin / "python"
-            system_python = root_path / "system-python"
-            scripts_dir.mkdir()
-            venv_bin.mkdir(parents=True)
-            system_python.write_text("", encoding="utf-8")
-            try:
-                venv_python.symlink_to(system_python)
-            except OSError:
-                venv_python.write_text("", encoding="utf-8")
+    def test_native_mdns_query_requests_unicast_response(self):
+        packet = discover.mdns_query_packet()
 
-            original_script_dir = discover.SCRIPT_DIR
-            try:
-                discover.SCRIPT_DIR = scripts_dir
+        self.assertTrue(packet.endswith(b"\x00\x0c\x80\x01"))
 
-                self.assertEqual(discover.sibling_venv_python(), venv_python)
-                self.assertTrue(discover.should_reexec_with_venv("/usr/bin/python3"))
-                self.assertFalse(discover.should_reexec_with_venv(str(venv_python)))
-                if venv_python.is_symlink():
-                    self.assertTrue(discover.should_reexec_with_venv(str(system_python)))
-            finally:
-                discover.SCRIPT_DIR = original_script_dir
+    def test_native_mdns_response_resolves_service_url(self):
+        instance = "Agent Notify TEST._agent-notify._tcp.local."
+        hostname = "TEST.local."
+        header = struct.pack("!HHHHHH", 0, 0x8400, 0, 4, 0, 0)
+        packet = b"".join(
+            [
+                header,
+                dns_rr("_agent-notify._tcp.local.", 12, dns_name(instance)),
+                dns_rr(instance, 33, struct.pack("!HHH", 0, 0, 17891) + dns_name(hostname)),
+                dns_rr(hostname, 1, socket.inet_aton("192.168.1.100")),
+                dns_rr(instance, 16, b"\x05path=/notify"),
+            ]
+        )
 
-    def test_url_from_service_info_uses_ipv4_address_and_port(self):
-        info = FakeServiceInfo([socket.inet_aton("127.0.0.1")], port=17891)
+        urls = discover.urls_from_mdns_packet(packet)
 
-        self.assertEqual(discover.url_from_service_info(info), "http://127.0.0.1:17891")
+        self.assertEqual(urls, ["http://192.168.1.100:17891"])
 
-    def test_discover_mdns_fetches_manifest_for_resolved_service(self):
-        fake_info = FakeServiceInfo([socket.inet_aton("127.0.0.1")], port=17891)
-        fake_zeroconf = FakeZeroconf(fake_info)
-        fetched_urls = []
+    def test_native_mdns_discovery_fetches_manifest(self):
+        class FakeSocket:
+            def __init__(self, *args, **kwargs):
+                self.sent = []
+                self.closed = False
+                self.received = False
 
-        class FakeBrowser:
-            def __init__(self, zeroconf, service_type, listener):
-                self.zeroconf = zeroconf
-                self.service_type = service_type
-                listener.add_service(
-                    zeroconf,
-                    service_type,
-                    "Agent Notify._agent-notify._tcp.local.",
-                )
+            def setsockopt(self, *args):
+                pass
 
-        original_loader = discover.load_zeroconf
+            def settimeout(self, timeout):
+                pass
+
+            def sendto(self, payload, address):
+                self.sent.append((payload, address))
+
+            def recvfrom(self, size):
+                if not self.received:
+                    self.received = True
+                    return b"packet", ("192.168.1.100", 5353)
+                raise socket.timeout()
+
+            def close(self):
+                self.closed = True
+
+        original_socket = discover.socket.socket
+        original_parse = discover.urls_from_mdns_packet
         original_fetch = discover.fetch_manifest
+        fake_socket = FakeSocket()
         try:
-            discover.load_zeroconf = lambda: (FakeBrowser, FakeZeroconf, lambda: fake_zeroconf)
+            discover.socket.socket = lambda *args, **kwargs: fake_socket
+            discover.urls_from_mdns_packet = lambda packet: ["http://192.168.1.100:17891"]
+            discover.fetch_manifest = lambda url, timeout=2.0: {"name": "Agent Notify Server", "url": url}
 
-            def fake_fetch(url, timeout=2.0):
-                fetched_urls.append(url)
-                return {"name": "Agent Notify Server", "url": url}
-
-            discover.fetch_manifest = fake_fetch
-
-            servers = discover.discover_mdns(timeout=0)
+            servers = discover.discover_mdns_native(timeout=0.01)
         finally:
-            discover.load_zeroconf = original_loader
+            discover.socket.socket = original_socket
+            discover.urls_from_mdns_packet = original_parse
             discover.fetch_manifest = original_fetch
 
-        self.assertEqual(fetched_urls, ["http://127.0.0.1:17891"])
-        self.assertEqual(servers, [{"name": "Agent Notify Server", "url": "http://127.0.0.1:17891"}])
-        self.assertTrue(fake_zeroconf.closed)
-
-    def test_dns_sd_fallback_resolves_instance_to_ipv4_manifest(self):
-        fetched_urls = []
-
-        def fake_collect(cmd, timeout):
-            if cmd[:2] == ["dns-sd", "-B"]:
-                return (
-                    "Timestamp A/R Flags if Domain Service Type Instance Name\n"
-                    "23:01:13 Add 2 18 local. _agent-notify._tcp. Agent Notify TEST-HOSTNAME\n"
-                )
-            if cmd[:2] == ["dns-sd", "-L"]:
-                return (
-                    "Agent\\032Notify\\032TEST-HOSTNAME._agent-notify._tcp.local. "
-                    "can be reached at TEST-HOSTNAME.local.:17891 (interface 18)\n"
-                )
-            if cmd[:2] == ["dns-sd", "-G"]:
-                return (
-                    "TEST-HOSTNAME.local. 192.168.1.100 120\n"
-                    "TEST-HOSTNAME.local. localhost 120\n"
-                )
-            return ""
-
-        original_collect = discover.collect_pty_output
-        original_fetch = discover.fetch_manifest
-        try:
-            discover.collect_pty_output = fake_collect
-
-            def fake_fetch(url, timeout=2.0):
-                fetched_urls.append(url)
-                return {"name": "Agent Notify Server", "url": url}
-
-            discover.fetch_manifest = fake_fetch
-
-            servers = discover.discover_mdns_dns_sd(timeout=0)
-        finally:
-            discover.collect_pty_output = original_collect
-            discover.fetch_manifest = original_fetch
-
-        self.assertEqual(fetched_urls, ["http://192.168.1.100:17891"])
         self.assertEqual(servers, [{"name": "Agent Notify Server", "url": "http://192.168.1.100:17891"}])
-
-    def test_listener_snapshot_deduplicates_under_lock(self):
-        listener = discover.AgentNotifyListener()
-        listener.urls = {
-            "Agent Notify._agent-notify._tcp.local.": "http://localhost:17891",
-            "Agent Notify duplicate._agent-notify._tcp.local.": "http://localhost:17891",
-        }
-
-        self.assertEqual(listener.snapshot_urls(), ["http://localhost:17891"])
+        self.assertEqual(fake_socket.sent[0][1], ("224.0.0.251", 5353))
+        self.assertTrue(fake_socket.closed)
 
     def test_manual_url_preserves_explicit_port(self):
         self.assertEqual(discover.normalize_manual_url("localhost"), "http://localhost:17891")

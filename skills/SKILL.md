@@ -9,7 +9,7 @@ Discover Agent Notify Windows servers and configure agent hooks for Claude Code,
 
 ## Default Workflow
 
-Do not only explain setup steps when this skill is invoked to configure notifications. Run the one-command setup script from this skill directory by default:
+Do not only explain setup steps when this skill is invoked to configure notifications. Run the one-command setup script from this skill directory by default. Automatic discovery uses the bundled standard library mDNS/DNS-SD client, so there is no package installation step.
 
 ```bash
 python scripts/setup.py --agents claude codex openclaw --events start stop --test
@@ -25,6 +25,8 @@ python scripts/setup.py --url http://IP:17891 --agents claude codex openclaw --e
 
 If the user asks for a preview or safety check, run the same command with `--dry-run` first. If Codex asks to trust hooks, tell the user to review `~/.codex/hooks.json` before approving. OpenClaw changes require restarting the OpenClaw Gateway.
 
+Use `--url http://IP:17891` when multicast discovery is blocked or the Windows server is on a different network.
+
 ## Usage
 
 ```
@@ -36,7 +38,7 @@ Or use individual scripts.
 ## Scripts
 
 ### discover.py
-mDNS/DNS-SD discovery for `_agent-notify._tcp.local.`. Use `--manual http://IP:17891` if multicast discovery is blocked.
+mDNS/DNS-SD discovery for `_agent-notify._tcp.local.`. It runs with the Python standard library. Use `--manual http://IP:17891` if multicast discovery is blocked.
 
 ```
 python scripts/discover.py --timeout 5 --json
@@ -91,4 +93,4 @@ For manual hook JSON and per-agent notes, read `references/hook-formats.md`.
 ## Requirements
 
 - Python 3.7+
-- `zeroconf` library for automatic mDNS discovery
+- Network access to the Agent Notify server on port `17891`

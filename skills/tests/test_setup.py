@@ -134,12 +134,7 @@ class SetupTests(unittest.TestCase):
         setup = load_setup_module()
 
         class FakeDiscover:
-            reexec_called = False
             timeout = None
-
-            @classmethod
-            def reexec_with_venv_if_available(cls):
-                cls.reexec_called = True
 
             @classmethod
             def discover_mdns(cls, timeout=3.0):
@@ -149,7 +144,6 @@ class SetupTests(unittest.TestCase):
         setup.discover = FakeDiscover
 
         self.assertEqual(setup.discover_server_url(), "http://localhost:17891")
-        self.assertTrue(FakeDiscover.reexec_called)
         self.assertEqual(FakeDiscover.timeout, 8.0)
 
     def test_non_interactive_setup_requires_url_when_discovery_fails(self):
