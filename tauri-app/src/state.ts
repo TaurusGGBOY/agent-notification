@@ -27,6 +27,8 @@ export interface AppState {
   windowsNotificationError: string;
   macosNotificationError: string;
   serviceHealthy: boolean;
+  appVersion: string;
+  aboutOpen: boolean;
   updateStatus: "idle" | "checking" | "available" | "current" | "installing" | "error";
   updateResult: UpdateCheckResult | null;
   updateError: string;
@@ -49,6 +51,8 @@ export const state: AppState = {
   windowsNotificationError: "",
   macosNotificationError: "",
   serviceHealthy: false,
+  appVersion: "",
+  aboutOpen: false,
   updateStatus: "idle",
   updateResult: null,
   updateError: "",

@@ -1,5 +1,6 @@
 import {
   getBroadcastStatus,
+  getAppVersion,
   getConfig,
   getMacosNotificationStatus,
   getManifest,
@@ -22,6 +23,12 @@ export async function refreshState(): Promise<void> {
   state.startupError = "";
   state.windowsNotificationError = "";
   state.macosNotificationError = "";
+  try {
+    state.appVersion = await getAppVersion();
+  } catch {
+    state.appVersion = "";
+  }
+
   try {
     const [config, manifest] = await Promise.all([getConfig(), getManifest()]);
     state.config = config;

@@ -37,6 +37,28 @@ test("UI exposes a manual update check with status feedback", async () => {
   assert.match(ui, /安装并重启/);
 });
 
+test("UI keeps failed update checks concise and hides the manifest endpoint", async () => {
+  const ui = await readProjectFile("src/ui.ts");
+
+  assert.match(ui, /formatUpdateError/);
+  assert.match(ui, /state\.updateError = formatUpdateError\(err\)/);
+  assert.doesNotMatch(ui, /updateCheckFailed"\)\}: \$\{state\.updateError/);
+});
+
+test("UI displays the Tauri app version instead of the notification service version", async () => {
+  const api = await readProjectFile("src/api.ts");
+  const service = await readProjectFile("src/service.ts");
+  const state = await readProjectFile("src/state.ts");
+  const ui = await readProjectFile("src/ui.ts");
+
+  assert.match(api, /getVersion/);
+  assert.match(api, /export async function getAppVersion/);
+  assert.match(service, /getAppVersion\(\)/);
+  assert.match(state, /appVersion: string/);
+  assert.match(ui, /const appVersion = state\.appVersion \|\| t\("unknown"\)/);
+  assert.doesNotMatch(ui, /const version = state\.manifest\?\.version/);
+});
+
 test("release workflow signs updater artifacts and publishes latest manifest", async () => {
   const workflow = await readProjectFile("../.github/workflows/release.yml");
   const checklist = await readProjectFile("../docs/release-checklist.md");
