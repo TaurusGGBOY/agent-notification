@@ -28,7 +28,12 @@
     "targets": "all",
     "createUpdaterArtifacts": true,
     "externalBin": ["binaries/agent-notify-server"],
-    "icon": ["icons/icon.png", "icons/icon.ico", "icons/icon.icns"]
+    "icon": ["icons/icon.png", "icons/icon.ico", "icons/icon.icns"],
+    "windows": {
+      "nsis": {
+        "installerHooks": "./windows/installer-hooks.nsh"
+      }
+    }
   },
   "plugins": {
     "updater": {
