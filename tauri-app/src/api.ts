@@ -1,4 +1,5 @@
 import { invoke } from "@tauri-apps/api/core";
+import { getVersion } from "@tauri-apps/api/app";
 import { relaunch } from "@tauri-apps/plugin-process";
 import { check, type Update } from "@tauri-apps/plugin-updater";
 
@@ -82,6 +83,10 @@ export async function getConfig(): Promise<AgentConfig> {
 
 export async function getManifest(): Promise<Manifest> {
   return getJson<Manifest>("/manifest");
+}
+
+export async function getAppVersion(): Promise<string> {
+  return await getVersion();
 }
 
 export async function getBroadcastStatus(): Promise<BroadcastStatus> {

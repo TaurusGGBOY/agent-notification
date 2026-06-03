@@ -170,7 +170,7 @@ export function render(): void {
   }
 
   const serviceUrl = state.manifest?.url ?? (currentLanguage() === "en" ? "Waiting for service URL" : "等待服务地址");
-  const version = state.manifest?.version ?? t("unknown");
+  const appVersion = state.appVersion || t("unknown");
   const broadcastEnabled = state.broadcast?.enabled ?? false;
   const startupEnabled = state.startup?.enabled ?? false;
   const startupSupported = state.startup?.supported === true;
@@ -267,7 +267,7 @@ export function render(): void {
           <div class="sparkline" aria-hidden="true"><span></span><span></span></div>
           <dl>
             <dt>${t("history")}</dt><dd>${state.history.length}</dd>
-            <dt>${t("version")}</dt><dd>v${escapeHtml(version)}</dd>
+            <dt>${t("version")}</dt><dd>v${escapeHtml(appVersion)}</dd>
           </dl>
         </div>
       </aside>
@@ -280,15 +280,21 @@ export function render(): void {
           </div>
           <div class="top-actions">
             <button class="language-button" data-action="language" title="${t("language")}">${nextLanguage.toUpperCase()}</button>
-            <div class="about-control">
-              <button class="icon-button about-button" data-action="about" type="button" aria-label="${currentLanguage() === "en" ? "About AgentNotify" : "关于 AgentNotify"}">
+            <div class="about-control ${state.aboutOpen ? "open" : ""}">
+              <button
+                class="icon-button about-button"
+                data-action="about"
+                type="button"
+                aria-expanded="${state.aboutOpen}"
+                aria-label="${currentLanguage() === "en" ? "About AgentNotify" : "关于 AgentNotify"}"
+              >
                 i
               </button>
               <section class="about-popover" aria-label="${currentLanguage() === "en" ? "About AgentNotify" : "关于 AgentNotify"}">
                 <h2>${currentLanguage() === "en" ? "About AgentNotify" : "关于 AgentNotify"}</h2>
                 <p>${currentLanguage() === "en" ? "Local agent notification service for task start and completion events." : "本机 Agent 通知服务，用于接收 Agent 任务开始和结束通知。"}</p>
                 <dl>
-                  <div><dt>${t("version")}</dt><dd>v${escapeHtml(version)}</dd></div>
+                  <div><dt>${t("version")}</dt><dd>v${escapeHtml(appVersion)}</dd></div>
                   <div><dt>${t("service")}</dt><dd>${escapeHtml(serviceStatusLabel)}</dd></div>
                   <div><dt>${t("address")}</dt><dd>${escapeHtml(serviceUrl)}</dd></div>
                   <div><dt>Skill</dt><dd>${escapeHtml(SKILL_INSTALL_COMMAND)}</dd></div>
@@ -449,7 +455,7 @@ function bindEvents(): void {
       state.updateStatus = state.updateResult.available ? "available" : "current";
     } catch (err) {
       state.updateStatus = "error";
-      state.updateError = err instanceof Error ? err.message : String(err);
+      state.updateError = formatUpdateError(err);
     }
     render();
   });
@@ -462,7 +468,7 @@ function bindEvents(): void {
       await installAvailableUpdate();
     } catch (err) {
       state.updateStatus = "error";
-      state.updateError = err instanceof Error ? err.message : String(err);
+      state.updateError = formatUpdateError(err);
       render();
     }
   });
@@ -473,19 +479,47 @@ function bindEvents(): void {
       void getCurrentWindow().startDragging();
     });
   });
+
+  document.querySelector<HTMLButtonElement>('[data-action="about"]')?.addEventListener("click", (event) => {
+    event.stopPropagation();
+    state.aboutOpen = !state.aboutOpen;
+    render();
+  });
+
+  document.querySelector<HTMLElement>(".about-popover")?.addEventListener("click", (event) => {
+    event.stopPropagation();
+  });
+
+  if (state.aboutOpen) {
+    document.addEventListener("click", closeAboutPopoverOnce, { once: true });
+  }
+}
+
+function closeAboutPopoverOnce(): void {
+  if (!state.aboutOpen) return;
+  state.aboutOpen = false;
+  render();
 }
 
 function updateStatusLabel(): string {
   if (state.updateStatus === "checking") return t("updateChecking");
   if (state.updateStatus === "installing") return t("installingUpdate");
   if (state.updateStatus === "current") return t("updateCurrent");
-  if (state.updateStatus === "error") return `${t("updateCheckFailed")}: ${state.updateError || t("unknown")}`;
+  if (state.updateStatus === "error") return state.updateError || t("updateCheckFailed");
   if (state.updateResult?.available) {
     return currentLanguage() === "en"
       ? `${t("updateAvailable")} v${state.updateResult.version}; current version is v${state.updateResult.currentVersion}.`
       : `${t("updateAvailable")} v${state.updateResult.version}，当前版本 v${state.updateResult.currentVersion}。`;
   }
   return t("updateHint");
+}
+
+function formatUpdateError(err: unknown): string {
+  const message = err instanceof Error ? err.message : String(err || "");
+  if (/https?:\/\//i.test(message) || /github\.com/i.test(message)) {
+    return t("updateCheckFailed");
+  }
+  return message ? `${t("updateCheckFailed")}: ${message}` : t("updateCheckFailed");
 }
 
 async function copySkillInstallCommand(): Promise<void> {

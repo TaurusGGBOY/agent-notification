@@ -440,6 +440,12 @@ button {
   opacity: .6;
 }
 
+.about-control.open .about-popover {
+  opacity: 1;
+  pointer-events: auto;
+  transform: translateY(0);
+}
+
 .about-control:is(:hover, :focus-within) .about-popover {
   opacity: 1;
   pointer-events: auto;

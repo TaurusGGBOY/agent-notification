@@ -76,17 +76,19 @@ test("dashboard exposes a copyable skill install command", async () => {
   assert.deepEqual(rootPackage.bin, { "agent-notification": "scripts/install-skill.mjs" });
 });
 
-test("topbar exposes about details on hover and keyboard focus", async () => {
+test("topbar exposes persistent about details after clicking the about button", async () => {
   const ui = await readProjectFile("src/ui.ts");
   const styles = await readProjectFile("src/styles.css");
 
   assert.match(ui, /data-action="about"/);
+  assert.match(ui, /aboutOpen/);
+  assert.match(ui, /class="about-control \$\{state\.aboutOpen \? "open" : ""\}"/);
   assert.match(ui, /关于 AgentNotify/);
   assert.match(ui, /本机 Agent 通知服务/);
-  assert.match(ui, /<dt>\$\{t\("version"\)\}<\/dt><dd>v\$\{escapeHtml\(version\)\}<\/dd>/);
+  assert.match(ui, /<dt>\$\{t\("version"\)\}<\/dt><dd>v\$\{escapeHtml\(appVersion\)\}<\/dd>/);
   assert.match(styles, /\.about-control\s*{/);
   assert.match(styles, /\.about-popover\s*{[^}]*position:\s*absolute;/s);
-  assert.match(styles, /\.about-control:is\(:hover,\s*:focus-within\)\s+\.about-popover\s*{/);
+  assert.match(styles, /\.about-control\.open\s+\.about-popover\s*{/);
 });
 
 test("dashboard exposes a one-click zh/en language toggle", async () => {
