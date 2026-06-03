@@ -62,6 +62,19 @@ test("Windows startup removes legacy standalone server launchers before managing
   assert.match(service, /CREATE_NO_WINDOW/);
 });
 
+test("Windows NSIS installer stops running app and sidecar before replacing files", async () => {
+  const config = JSON.parse(await readProjectFile("src-tauri/tauri.conf.json"));
+  const hooksPath = config.bundle.windows.nsis.installerHooks;
+  const hooks = await readProjectFile(`src-tauri/${hooksPath}`);
+
+  assert.equal(hooksPath, "./windows/installer-hooks.nsh");
+  assert.match(hooks, /NSIS_HOOK_PREINSTALL/);
+  assert.match(hooks, /NSIS_HOOK_PREUNINSTALL/);
+  assert.match(hooks, /taskkill/);
+  assert.match(hooks, /AgentNotify\.exe/);
+  assert.match(hooks, /agent-notify-server\*\.exe/);
+});
+
 test("dashboard exposes a copyable skill install command", async () => {
   const ui = await readProjectFile("src/ui.ts");
   const styles = await readProjectFile("src/styles.css");
