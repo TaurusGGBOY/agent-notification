@@ -63,6 +63,10 @@ fn main() {
                     height: 675.0,
                 }));
                 let _ = window.center();
+                if !startup::is_autostart_launch() {
+                    let _ = window.show();
+                    let _ = window.set_focus();
+                }
             }
             #[cfg(target_os = "macos")]
             native_notification::make_windows_capturable();
