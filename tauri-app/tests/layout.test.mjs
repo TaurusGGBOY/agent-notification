@@ -22,6 +22,19 @@ test("main window uses the 1200x675 logical design size", async () => {
   assert.match(main, /height:\s*675\.0/);
 });
 
+test("autostart launches silently while manual launches show the main window", async () => {
+  const config = JSON.parse(await readProjectFile("src-tauri/tauri.conf.json"));
+  const main = await readProjectFile("src-tauri/src/main.rs");
+  const startup = await readProjectFile("src-tauri/src/startup.rs");
+
+  assert.equal(config.app.windows[0].visible, false);
+  assert.match(main, /if !startup::is_autostart_launch\(\) \{/);
+  assert.match(main, /window\.show\(\)/);
+  assert.match(startup, /const AUTOSTART_ARG: &str = "--autostart";/);
+  assert.match(startup, /format!\(r#""\{\}" \{AUTOSTART_ARG\}"#, exe\.display\(\)\)/);
+  assert.match(startup, /<string>\{AUTOSTART_ARG\}<\/string>/);
+});
+
 test("notification surface does not expose style or preview controls", async () => {
   const ui = await readProjectFile("src/ui.ts");
   const styles = await readProjectFile("src/styles.css");

@@ -5,6 +5,7 @@ use std::path::{Path, PathBuf};
 
 const APP_LABEL: &str = "com.agentnotify.client";
 const APP_NAME: &str = "AgentNotify";
+const AUTOSTART_ARG: &str = "--autostart";
 #[cfg(windows)]
 const CREATE_NO_WINDOW: u32 = 0x0800_0000;
 const WINDOWS_RUN_KEY: &str = r"HKCU\Software\Microsoft\Windows\CurrentVersion\Run";
@@ -28,6 +29,14 @@ pub fn startup_status() -> StartupStatus {
 pub fn set_startup_enabled(enabled: bool) -> Result<StartupStatus, String> {
     set_startup_enabled_impl(enabled)?;
     Ok(startup_status())
+}
+
+pub fn is_autostart_launch() -> bool {
+    is_autostart_args(std::env::args())
+}
+
+fn is_autostart_args(args: impl IntoIterator<Item = String>) -> bool {
+    args.into_iter().any(|arg| arg == AUTOSTART_ARG)
 }
 
 #[cfg(windows)]
@@ -59,7 +68,8 @@ fn query_startup_enabled() -> Option<bool> {
 #[cfg(windows)]
 fn set_startup_enabled_impl(enabled: bool) -> Result<(), String> {
     if enabled {
-        let exe = std::env::current_exe().map_err(|err| format!("failed to resolve current executable: {err}"))?;
+        let exe = std::env::current_exe()
+            .map_err(|err| format!("failed to resolve current executable: {err}"))?;
         let args = windows_run_set_args(&exe);
         let refs = args.iter().map(String::as_str).collect::<Vec<_>>();
         let status = hidden_windows_command("reg")
@@ -88,7 +98,8 @@ fn set_startup_enabled_impl(enabled: bool) -> Result<(), String> {
     let plist_path = macos_launch_agent_path()
         .ok_or_else(|| "failed to resolve macOS LaunchAgents directory".to_string())?;
     if enabled {
-        let exe = std::env::current_exe().map_err(|err| format!("failed to resolve current executable: {err}"))?;
+        let exe = std::env::current_exe()
+            .map_err(|err| format!("failed to resolve current executable: {err}"))?;
         let parent = plist_path
             .parent()
             .ok_or_else(|| "failed to resolve macOS LaunchAgents directory".to_string())?;
@@ -128,7 +139,7 @@ fn windows_run_set_args(exe: &Path) -> Vec<String> {
         "/t".to_string(),
         "REG_SZ".to_string(),
         "/d".to_string(),
-        format!(r#""{}""#, exe.display()),
+        format!(r#""{}" {AUTOSTART_ARG}"#, exe.display()),
         "/f".to_string(),
     ]
 }
@@ -155,6 +166,7 @@ fn macos_launch_agent_plist(exe: &Path) -> String {
   <key>ProgramArguments</key>
   <array>
     <string>{}</string>
+    <string>{AUTOSTART_ARG}</string>
   </array>
   <key>RunAtLoad</key>
   <true/>
@@ -177,23 +189,28 @@ fn xml_escape(value: &str) -> String {
 
 #[cfg(test)]
 mod tests {
-    use super::{macos_launch_agent_plist, windows_run_set_args};
+    use super::{is_autostart_args, macos_launch_agent_plist, windows_run_set_args, AUTOSTART_ARG};
     use std::path::Path;
 
     #[test]
     fn macos_launch_agent_plist_runs_current_app_at_login() {
-        let plist = macos_launch_agent_plist(Path::new("/Applications/AgentNotify.app/Contents/MacOS/AgentNotify"));
+        let plist = macos_launch_agent_plist(Path::new(
+            "/Applications/AgentNotify.app/Contents/MacOS/AgentNotify",
+        ));
 
         assert!(plist.contains("<key>Label</key>"));
         assert!(plist.contains("<string>com.agentnotify.client</string>"));
         assert!(plist.contains("<key>RunAtLoad</key>"));
         assert!(plist.contains("<true/>"));
         assert!(plist.contains("/Applications/AgentNotify.app/Contents/MacOS/AgentNotify"));
+        assert!(plist.contains(&format!("<string>{AUTOSTART_ARG}</string>")));
     }
 
     #[test]
     fn macos_launch_agent_plist_escapes_xml_paths() {
-        let plist = macos_launch_agent_plist(Path::new("/Applications/Agent & Notify.app/Contents/MacOS/Agent<Notify>"));
+        let plist = macos_launch_agent_plist(Path::new(
+            "/Applications/Agent & Notify.app/Contents/MacOS/Agent<Notify>",
+        ));
 
         assert!(plist.contains("Agent &amp; Notify.app"));
         assert!(plist.contains("Agent&lt;Notify&gt;"));
@@ -213,9 +230,18 @@ mod tests {
                 "/t",
                 "REG_SZ",
                 "/d",
-                r#""C:\Program Files\AgentNotify\AgentNotify.exe""#,
+                r#""C:\Program Files\AgentNotify\AgentNotify.exe" --autostart"#,
                 "/f",
             ],
         );
+    }
+
+    #[test]
+    fn autostart_launch_is_detected_from_command_line_arguments() {
+        assert!(is_autostart_args(vec![
+            "AgentNotify".to_string(),
+            AUTOSTART_ARG.to_string()
+        ]));
+        assert!(!is_autostart_args(vec!["AgentNotify".to_string()]));
     }
 }
